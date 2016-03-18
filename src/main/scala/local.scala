@@ -9,31 +9,36 @@ object Local {
         val pathToMatrix = getClass.getResource("/0.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
-        // Create a DenseMatrix from the CSV
+        // Create a DenseMatrix from the CSV.
         var matrix = breeze.linalg.csvread(matrixFile)
         // println(matrix)
 
-        // Centralizing and scala the data
+        // Centralizing and scale the data.
         val meancols = mean(matrix(::, *))
         // Waiting for fix scalanlp/breeze#450
-        matrix = (matrix.t(::,*) - meancols.t).t
+        matrix = (matrix.t(::, *) - meancols.t).t
         matrix /= max(abs(matrix))
 
-        println(matrix)
+        // Build affinity matrix.
+        val distances = distanceMatrix(matrix)
+
+        // println(distances)
     }
 
-    def rowrepmat(matrix: breeze.linalg.DenseMatrix[Double], rep: Int): breeze.linalg.DenseMatrix[Double] = {
-        var X = matrix.copy
-        for(a <- 0 to rep){
-            X = DenseMatrix.vertcat(X, matrix)
+    def distanceMatrix(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
+        var distanceMatrix = DenseMatrix.zeros[Double](matrix.rows,matrix.rows)
+        var distanceVector = DenseVector(0.0).t
+        var distance = 0.0
+        (0 until matrix.rows).map{mainRow =>
+            (mainRow + 1 until matrix.rows).map{secondRow =>
+                distanceVector = matrix(mainRow, ::) - matrix(secondRow,::) // Xi - Xj
+                distanceVector *= distanceVector // (Xi - Xj)^^2
+                distance = sqrt(sum(distanceVector)) // √(Xi - Xj)^^2 + (Yi - Yj)^^2 + ...
+                distanceMatrix(mainRow, secondRow) = distance
+                distanceMatrix(secondRow, mainRow) = distance
+            }
         }
-        return X
+        println(distanceMatrix)
+        return distanceMatrix
     }
-
-    // Compute the mean of each column
-    def meancols(matrix: breeze.linalg.DenseMatrix[Double]): Array[String] = {
-        var mean = new Array[String](matrix.cols)
-        return mean
-    }
-
 }
