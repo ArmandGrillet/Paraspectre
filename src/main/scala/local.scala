@@ -1,7 +1,6 @@
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats._
-import scala.math.{pow, exp}
 import java.io.File
 
 object Local {
@@ -15,7 +14,6 @@ object Local {
 
         // Create a DenseMatrix from the CSV.
         var matrix = breeze.linalg.csvread(matrixFile)
-        // println(matrix)
 
         // Centralizing and scale the data.
         val meancols = mean(matrix(::, *))
@@ -23,12 +21,15 @@ object Local {
         matrix = (matrix.t(::, *) - meancols.t).t
         matrix /= max(abs(matrix))
 
-        // Build affinity matrix.
+        // Build locally scaled affinity matrix.
         val distances = euclideanDistance(matrix) // Euclidean distance.
         val locScale = localScale(distances, k)
         val locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
 
-        println(locallyScaledA)
+        // Build the normalized affinity matrix.
+        val diagonalMatrix = sum(locallyScaledA(*, ::))
+        val normalizedA = diag(pow(diagonalMatrix, -0.5)) * locallyScaledA * diag(pow(diagonalMatrix, -0.5))
+        println(normalizedA)
     }
 
     def euclideanDistance(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
@@ -69,9 +70,9 @@ object Local {
 
         (0 until distanceMatrix.rows).map{ mainRow =>
             (mainRow + 1 until distanceMatrix.rows).map{ secondRow =>
-                affinityMatrix(mainRow, secondRow) = -pow(distanceMatrix(mainRow, secondRow), 2)
+                affinityMatrix(mainRow, secondRow) = -scala.math.pow(distanceMatrix(mainRow, secondRow), 2)
                 affinityMatrix(mainRow, secondRow) = affinityMatrix(mainRow, secondRow) / (localScale(mainRow) * localScale(secondRow))
-                affinityMatrix(mainRow, secondRow) = exp(affinityMatrix(mainRow, secondRow))
+                affinityMatrix(mainRow, secondRow) = scala.math.exp(affinityMatrix(mainRow, secondRow))
                 affinityMatrix(secondRow, mainRow) = affinityMatrix(mainRow, secondRow)
             }
         }
