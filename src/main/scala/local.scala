@@ -4,6 +4,9 @@ import breeze.stats._
 import java.io.File
 
 object Local {
+    // Parameters.
+    val k = 7 // K'th neighbor used in local scaling.
+
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
         val pathToMatrix = getClass.getResource("/0.csv").getPath()
@@ -21,8 +24,8 @@ object Local {
 
         // Build affinity matrix.
         val distances = distanceMatrix(matrix) // Euclidean distance.
-
-        println(distances)
+        val locScale = localScale(distances, k)
+        println(locScale)
     }
 
     def distanceMatrix(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
@@ -41,5 +44,22 @@ object Local {
         }
 
         return distanceMatrix
+    }
+
+    def localScale(distanceMatrix: DenseMatrix[Double], k: Int): DenseVector[Double] = {
+        var localScale = DenseVector.zeros[Double](distanceMatrix.cols)
+        var sortedVector = IndexedSeq(0.0)
+        if (k > distanceMatrix.cols) {
+            (0 until distanceMatrix.cols).map{col =>
+                localScale(col) = distanceMatrix(::, col).max
+            }
+        } else {
+            (0 until distanceMatrix.cols).map{col =>
+                sortedVector = distanceMatrix(::, col).toArray.sorted
+                localScale(col) = sortedVector(k - 1)
+            }
+        }
+
+        return localScale
     }
 }
