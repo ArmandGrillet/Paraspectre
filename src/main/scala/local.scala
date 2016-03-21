@@ -1,6 +1,7 @@
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats._
+import scala.math.{pow, exp}
 import java.io.File
 
 object Local {
@@ -23,23 +24,23 @@ object Local {
         matrix /= max(abs(matrix))
 
         // Build affinity matrix.
-        val distances = distanceMatrix(matrix) // Euclidean distance.
+        val distances = euclideanDistance(matrix) // Euclidean distance.
         val locScale = localScale(distances, k)
-        println(locScale)
+        val locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
+
+        println(locallyScaledA)
     }
 
-    def distanceMatrix(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
-        var distanceMatrix = DenseMatrix.zeros[Double](matrix.rows,matrix.rows) // Distance matrix, size rows x rows.
+    def euclideanDistance(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
+        var distanceMatrix = DenseMatrix.zeros[Double](matrix.rows, matrix.rows) // Distance matrix, size rows x rows.
         var distanceVector = DenseVector(0.0).t // The distance vector containing the distance between two vectors.
-        var distance = 0.0 // The Euclidean distance.
 
-        (0 until matrix.rows).map{mainRow =>
-            (mainRow + 1 until matrix.rows).map{secondRow =>
-                distanceVector = matrix(mainRow, ::) - matrix(secondRow,::) // Xi - Xj
-                distanceVector *= distanceVector // (Xi - Xj)^^2
-                distance = sqrt(sum(distanceVector)) // √(Xi - Xj)^^2 + (Yi - Yj)^^2 + ...
-                distanceMatrix(mainRow, secondRow) = distance
-                distanceMatrix(secondRow, mainRow) = distance
+        (0 until matrix.rows).map{ mainRow =>
+            (mainRow + 1 until matrix.rows).map{ secondRow =>
+                distanceVector = matrix(mainRow, ::) - matrix(secondRow,::) // Xi - Xj | Yi - Yj
+                distanceVector *= distanceVector // (Xi - Xj)^^2 | (Yi - Yj)^^2
+                distanceMatrix(mainRow, secondRow) = sqrt(sum(distanceVector)) // √(Xi - Xj)^^2 + (Yi - Yj)^^2 + ...
+                distanceMatrix(secondRow, mainRow) = distanceMatrix(mainRow, secondRow)
             }
         }
 
@@ -61,5 +62,20 @@ object Local {
         }
 
         return localScale
+    }
+
+    def locallyScaledAffinityMatrix(distanceMatrix: DenseMatrix[Double], localScale: DenseVector[Double]): DenseMatrix[Double] = {
+        var affinityMatrix = DenseMatrix.zeros[Double](distanceMatrix.rows, distanceMatrix.rows) // Distance matrix, size rows x rows.
+
+        (0 until distanceMatrix.rows).map{ mainRow =>
+            (mainRow + 1 until distanceMatrix.rows).map{ secondRow =>
+                affinityMatrix(mainRow, secondRow) = -pow(distanceMatrix(mainRow, secondRow), 2)
+                affinityMatrix(mainRow, secondRow) = affinityMatrix(mainRow, secondRow) / (localScale(mainRow) * localScale(secondRow))
+                affinityMatrix(mainRow, secondRow) = exp(affinityMatrix(mainRow, secondRow))
+                affinityMatrix(secondRow, mainRow) = affinityMatrix(mainRow, secondRow)
+            }
+        }
+
+        return affinityMatrix
     }
 }
