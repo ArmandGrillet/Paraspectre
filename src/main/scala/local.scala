@@ -6,6 +6,8 @@ import java.io.File
 object Local {
     // Parameters.
     val k = 7 // K'th neighbor used in local scaling.
+    val minClusters = 2 // Minimal number of clusters in the dataset.
+    val maxClusters = 6 // Maximal number of clusters in the dataset.
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
@@ -51,6 +53,7 @@ object Local {
     def localScale(distanceMatrix: DenseMatrix[Double], k: Int): DenseVector[Double] = {
         var localScale = DenseVector.zeros[Double](distanceMatrix.cols)
         var sortedVector = IndexedSeq(0.0)
+
         if (k > distanceMatrix.cols) {
             (0 until distanceMatrix.cols).map{col =>
                 localScale(col) = distanceMatrix(::, col).max
@@ -78,5 +81,32 @@ object Local {
         }
 
         return affinityMatrix
+    }
+
+    def largestPossibleGroupNumber(affinityMatrix: DenseMatrix[Double], minClusters: Int, maxClusters: Int): Int = {
+        if (minClusters > maxClusters || minClusters < 2) {
+            return 0
+        }
+
+        // Compute the Laplacian
+        // TODO : Use CSCMatrix if sparse affinity matrix.
+        val ones = DenseMatrix.ones[Double](affinityMatrix.rows, affinityMatrix.cols)
+        val sumAffinityMatrix = sum(affinityMatrix(::, *))
+        val diagonal = sqrt(ones :/ sumAffinityMatrix)
+        val laplacian = diagonal * affinityMatrix * diagonal
+
+        // Compute eigenvectors
+        val svd.SVD(_, _, rightSingularVectors) = svd(laplacian)
+        var eigenvectors = rightSingularVectors(::, 0 until maxClusters)
+
+        // Compute eigenvalues
+        var eigenvalues = diag(eigenvectors)
+        eigenvalues = eigenvalues(0 until maxClusters)
+
+        // Rotate eigenvectors
+        eigenvectors = eigenvectors(::, 0 until minClusters)
+        // TODO: compute the gradient of the eigenvectors alignment quality
+
+        return 1
     }
 }
