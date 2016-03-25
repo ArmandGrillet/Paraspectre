@@ -23,14 +23,14 @@ package object serial {
         var localScale = DenseVector.zeros[Double](distanceMatrix.cols)
         var sortedVector = IndexedSeq(0.0)
 
-        if (k > distanceMatrix.cols) {
+        if (k >= distanceMatrix.cols - 1) {
             (0 until distanceMatrix.cols).map{col =>
                 localScale(col) = distanceMatrix(::, col).max
             }
         } else {
             (0 until distanceMatrix.cols).map{col =>
                 sortedVector = distanceMatrix(::, col).toArray.sorted
-                localScale(col) = sortedVector(k - 1)
+                localScale(col) = sortedVector(k)
             }
         }
 
