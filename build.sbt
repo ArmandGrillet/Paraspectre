@@ -14,12 +14,8 @@ libraryDependencies  ++= Seq(
     "org.scalanlp" %% "breeze-natives" % "0.12",
     // the visualization library is distributed separately as well.
     // It depends on LGPL code.
-    "org.scalanlp" %% "breeze-viz" % "0.12"
-)
-
-resolvers ++= Seq(
-    // other resolvers here
-    // if you want to use snapshot builds (currently 0.12-SNAPSHOT), use this.
-    "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/",
-    "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
+    "org.scalanlp" %% "breeze-viz" % "0.12",
+    // The unit test library.
+    "org.scalactic" %% "scalactic" % "2.2.6",
+    "org.scalatest" %% "scalatest" % "2.2.6" % "test"
 )
