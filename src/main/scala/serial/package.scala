@@ -10,8 +10,8 @@ package object serial {
         (0 until matrix.rows).map{ mainRow =>
             (mainRow + 1 until matrix.rows).map{ secondRow =>
                 distanceVector = matrix(mainRow, ::) - matrix(secondRow,::) // Xi - Xj | Yi - Yj
-                distanceVector *= distanceVector // (Xi - Xj)^^2 | (Yi - Yj)^^2
-                distanceMatrix(mainRow, secondRow) = sqrt(sum(distanceVector)) // √(Xi - Xj)^^2 + (Yi - Yj)^^2 + ...
+                distanceVector *= distanceVector // (Xi - Xj)² | (Yi - Yj)²
+                distanceMatrix(mainRow, secondRow) = sqrt(sum(distanceVector)) // √(Xi - Xj)² + (Yi - Yj)² + ...
                 distanceMatrix(secondRow, mainRow) = distanceMatrix(mainRow, secondRow)
             }
         }
@@ -25,12 +25,12 @@ package object serial {
 
         if (k >= distanceMatrix.cols - 1) {
             (0 until distanceMatrix.cols).map{col =>
-                localScale(col) = distanceMatrix(::, col).max
+                localScale(col) = distanceMatrix(::, col).max // Maximum distance.
             }
         } else {
             (0 until distanceMatrix.cols).map{col =>
                 sortedVector = distanceMatrix(::, col).toArray.sorted
-                localScale(col) = sortedVector(k)
+                localScale(col) = sortedVector(k) // Kth nearest distance.
             }
         }
 
@@ -42,9 +42,9 @@ package object serial {
 
         (0 until distanceMatrix.rows).map{ mainRow =>
             (mainRow + 1 until distanceMatrix.rows).map{ secondRow =>
-                affinityMatrix(mainRow, secondRow) = -scala.math.pow(distanceMatrix(mainRow, secondRow), 2)
-                affinityMatrix(mainRow, secondRow) = affinityMatrix(mainRow, secondRow) / (localScale(mainRow) * localScale(secondRow))
-                affinityMatrix(mainRow, secondRow) = scala.math.exp(affinityMatrix(mainRow, secondRow))
+                affinityMatrix(mainRow, secondRow) = -scala.math.pow(distanceMatrix(mainRow, secondRow), 2) // -d(si, sj)²
+                affinityMatrix(mainRow, secondRow) = affinityMatrix(mainRow, secondRow) / (localScale(mainRow) * localScale(secondRow)) // -d(si, sj)² / lambi * lambj
+                affinityMatrix(mainRow, secondRow) = scala.math.exp(affinityMatrix(mainRow, secondRow)) // exp(-d(si, sj)² / lambi * lambj)
                 affinityMatrix(secondRow, mainRow) = affinityMatrix(mainRow, secondRow)
             }
         }
