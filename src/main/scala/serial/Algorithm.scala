@@ -10,6 +10,7 @@ object Algorithm {
     val k = 7 // K'th neighbor used in local scaling.
     val minClusters = 2 // Minimal number of clusters in the dataset.
     val maxClusters = 6 // Maximal number of clusters in the dataset.
+    val eps = 2.2204e-16
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
@@ -21,18 +22,45 @@ object Algorithm {
 
         // Centralizing and scale the data.
         val meancols = mean(matrix(::, *))
-        // Waiting for fix scalanlp/breeze#450
-        matrix = (matrix.t(::, *) - meancols.t).t
+        matrix = (matrix.t(::, *) - meancols.t).t // Waiting for fix scalanlp/breeze#450
         matrix /= max(abs(matrix))
 
         // Build locally scaled affinity matrix.
-        val distances = euclideanDistance(matrix) // Euclidean distance.
+        val distances = euclideanDistance(matrix)
         val locScale = localScale(distances, k)
-        val locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
+        var locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
 
-        // Build the normalized affinity matrix.
-        val diagonalMatrix = sum(locallyScaledA(*, ::))
-        val normalizedA = diag(pow(diagonalMatrix, -0.5)) * locallyScaledA * diag(pow(diagonalMatrix, -0.5))
-        println(normalizedA)
+        // Zero out diagonal
+        locallyScaledA = locallyScaledA :* logicalNot(DenseMatrix.eye[Double](matrix.rows)) // logicalNot = ~
+
+        // Build the normalized affinity matrix, in the paper but not the code.
+        // val diagonalMatrix = sum(locallyScaledA(*, ::))
+        // val normalizedA = diag(pow(diagonalMatrix, -0.5)) * locallyScaledA * diag(pow(diagonalMatrix, -0.5))
+
+        // In evecs.m originally
+        // Compute the Laplacian
+        // TODO : Use CSCMatrix if sparse affinity matrix.
+        // Sum down each column
+        val sumAffinityMatrix = sum(locallyScaledA(::, *)) + DenseVector.fill(locallyScaledA.rows){eps}.t
+        val diagonal = diag(sqrt(DenseVector.ones[Double](locallyScaledA.rows).t :/ sumAffinityMatrix))
+        val laplacian = diagonal * locallyScaledA * diagonal
+
+        // Compute eigenvectors
+        val svd.SVD(_, _, rightSingularVectors) = svd(laplacian)
+        val eigenvectors = rightSingularVectors(::, 0 until maxClusters)
+        println(eigenvectors)
+        // end of evecs.m
+
+        // In cluster_rotate.m originally
+        
+
+        // Compute the eigenvalues
+        // var eigenvalues = diag(eigenvectors)
+        // eigenvalues = eigenvalues(0 until maxClusters)
+
+        // Rotate eigenvectors
+        // var currentEigenvectors = eigenvectors(::, 0 until minClusters)
+
+        // TODO: compute the gradient of the eigenvectors alignment quality
     }
 }

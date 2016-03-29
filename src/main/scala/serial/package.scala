@@ -52,30 +52,28 @@ package object serial {
         return affinityMatrix
     }
 
-    def largestPossibleGroupNumber(affinityMatrix: DenseMatrix[Double], minClusters: Int, maxClusters: Int): Int = {
-        if (minClusters > maxClusters || minClusters < 2) {
-            return 0
+    def logicalNot(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
+        var result = DenseMatrix.zeros[Double](matrix.rows, matrix.cols)
+        var row = 0
+        while (row < matrix.rows) {
+            var col = 0
+            while (col < matrix.cols) {
+                if (matrix(row, col) == 0) {
+                    result(row, col) = 1
+                }
+                col += 1
+            }
+            row += 1
         }
 
-        // Compute the Laplacian
-        // TODO : Use CSCMatrix if sparse affinity matrix.
-        val ones = DenseMatrix.ones[Double](affinityMatrix.rows, affinityMatrix.cols)
-        val sumAffinityMatrix = sum(affinityMatrix(::, *))
-        val diagonal = sqrt(ones :/ sumAffinityMatrix)
-        val laplacian = diagonal * affinityMatrix * diagonal
+        return result
+    }
 
-        // Compute eigenvectors
-        val svd.SVD(_, _, rightSingularVectors) = svd(laplacian)
-        var eigenvectors = rightSingularVectors(::, 0 until maxClusters)
-
-        // Compute eigenvalues
-        var eigenvalues = diag(eigenvectors)
-        eigenvalues = eigenvalues(0 until maxClusters)
-
-        // Rotate eigenvectors
-        eigenvectors = eigenvectors(::, 0 until minClusters)
-        // TODO: compute the gradient of the eigenvectors alignment quality
-
-        return 1
+    def cbest(eigenvectors: DenseMatrix[Double]) : {val clusterAssignment : DenseMatrix[Double]; val quality : Double; val rotatedEigenvectors : DenseMatrix[Double]} = {
+        new {
+            val clusterAssignment = DenseMatrix.zeros[Double](2, 2)
+            val quality = 1.0;
+            val rotatedEigenvectors = DenseMatrix.zeros[Double](2, 2)
+        }
     }
 }
