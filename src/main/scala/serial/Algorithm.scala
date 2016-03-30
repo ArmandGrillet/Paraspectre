@@ -48,15 +48,23 @@ object Algorithm {
         // Compute eigenvectors
         val svd.SVD(_, _, rightSingularVectors) = svd(laplacian)
         val eigenvectors = rightSingularVectors(::, 0 until maxClusters)
-        println(eigenvectors)
-        // end of evecs.m
-
-        // In cluster_rotate.m originally
-        
 
         // Compute the eigenvalues
         // var eigenvalues = diag(eigenvectors)
         // eigenvalues = eigenvalues(0 until maxClusters)
+        // end of evecs.m
+
+        // In cluster_rotate.m originally
+        var cluster = DenseMatrix.zeros[Double](1, 1)
+        var quality = 0.0
+        var rotatedEigenvectors = DenseMatrix.zeros[Double](1, 1)
+
+        var currentEigenvectors = eigenvectors(::, 0 until minClusters)
+        val (tempCluster, tempQuality, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+
+        // In evrot.cpp originally
+
+
 
         // Rotate eigenvectors
         // var currentEigenvectors = eigenvectors(::, 0 until minClusters)

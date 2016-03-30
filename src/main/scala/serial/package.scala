@@ -69,11 +69,43 @@ package object serial {
         return result
     }
 
-    def cbest(eigenvectors: DenseMatrix[Double]) : {val clusterAssignment : DenseMatrix[Double]; val quality : Double; val rotatedEigenvectors : DenseMatrix[Double]} = {
-        new {
-            val clusterAssignment = DenseMatrix.zeros[Double](2, 2)
-            val quality = 1.0;
-            val rotatedEigenvectors = DenseMatrix.zeros[Double](2, 2)
+    def rotateEigenvectors(eigenvectors: DenseMatrix[Double]): (DenseMatrix[Double], Double, DenseMatrix[Double]) = {
+        // Only works in two dimensions now.
+        val ndata = eigenvectors.rows
+        val dim = eigenvectors.cols
+
+        // Get the number of angles
+        val angles = (dim*(dim-1)/2).toInt
+        val theta = DenseMatrix.zeros[Double](1, angles)
+
+        // We know that the method is 1
+
+        // Build index mapping
+        var ik = DenseVector.zeros[Int](angles)
+        var jk = DenseVector.zeros[Int](angles)
+        var k = 0
+        var i = 0
+        while (i < dim - 1) {
+            var j = i + 1
+            while (j < dim) {
+                ik(k) = i
+                jk(k) = j
+                k += 1
+                j += 1
+            }
+            i += 1
         }
+
+        // Definitions
+        val maxIterations = 200
+        var iteration = 0
+        var q, qOld1, qOld2 = alignmentQuality(eigenvectors, ik, jk, dim, ndata)
+
+
+        return (DenseMatrix.zeros[Double](2, 2), 1.0, DenseMatrix.zeros[Double](2, 2))
+    }
+
+    def alignmentQuality(eigenvectors: DenseMatrix[Double], ik: DenseVector[Int], jk: DenseVector[Int], dimensions: Int, ndata: Int): Double = {
+        return 1.0
     }
 }
