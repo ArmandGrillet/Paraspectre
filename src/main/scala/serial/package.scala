@@ -20,21 +20,19 @@ package object serial {
     }
 
     def localScale(distanceMatrix: DenseMatrix[Double], k: Int): DenseVector[Double] = {
-        var localScale = DenseVector.zeros[Double](distanceMatrix.cols)
-        var sortedVector = IndexedSeq(0.0)
-
         if (k >= distanceMatrix.cols - 1) {
-            (0 until distanceMatrix.cols).map{col =>
-                localScale(col) = distanceMatrix(::, col).max // Maximum distance.
-            }
+            return max(distanceMatrix(*, ::)) // Maximum distance.
         } else {
+            var localScale = DenseVector.zeros[Double](distanceMatrix.cols)
+            var sortedVector = IndexedSeq(0.0)
+
             (0 until distanceMatrix.cols).map{col =>
                 sortedVector = distanceMatrix(::, col).toArray.sorted
                 localScale(col) = sortedVector(k) // Kth nearest distance.
             }
-        }
 
-        return localScale
+            return localScale
+        }
     }
 
     def locallyScaledAffinityMatrix(distanceMatrix: DenseMatrix[Double], localScale: DenseVector[Double]): DenseMatrix[Double] = {
@@ -99,13 +97,47 @@ package object serial {
         // Definitions
         val maxIterations = 200
         var iteration = 0
-        var q, qOld1, qOld2 = alignmentQuality(eigenvectors, ik, jk, dim, ndata)
+        var q, qOld1, qOld2 = alignmentQuality(eigenvectors)
 
 
         return (DenseMatrix.zeros[Double](2, 2), 1.0, DenseMatrix.zeros[Double](2, 2))
     }
 
-    def alignmentQuality(eigenvectors: DenseMatrix[Double], ik: DenseVector[Int], jk: DenseVector[Int], dimensions: Int, ndata: Int): Double = {
-        return 1.0
+    def alignmentQuality(eigenvectors: DenseMatrix[Double]): Double = {
+        // Take the square of all entries and find the max of each row
+        val squareMatrix = square(eigenvectors)
+        val maxEachRow = max(squareMatrix(*, ::))
+
+        // Compute cost
+        var cost = 0.0
+        var row = 0
+        while (row < eigenvectors.rows) {
+            var col = 0
+            while (col < eigenvectors.cols) {
+                cost += squareMatrix(row, col) / maxEachRow(row)
+                col += 1
+            }
+            row += 1
+        }
+
+        cost = 1.0 - (cost / eigenvectors.rows - 1.0) / eigenvectors.cols
+
+        return cost
     }
+
+    def square(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
+        var result = DenseMatrix.zeros[Double](matrix.rows, matrix.cols)
+        var row = 0
+        while (row < matrix.rows) {
+            var col = 0
+            while (col < matrix.cols) {
+                result(row, col) = matrix(row, col) * matrix(row, col)
+                col += 1
+            }
+            row += 1
+        }
+
+        return result
+    }
+
 }
