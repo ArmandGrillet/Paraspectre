@@ -74,7 +74,7 @@ package object serial {
 
         // Get the number of angles
         val angles = (dim*(dim-1)/2).toInt
-        val theta = DenseMatrix.zeros[Double](1, angles)
+        val theta = DenseVector.zeros[Double](angles)
 
         // We know that the method is 1
 
@@ -96,8 +96,16 @@ package object serial {
 
         // Definitions
         val maxIterations = 200
-        var iteration = 0
+        var iteration, d = 0
         var q, qOld1, qOld2 = alignmentQuality(eigenvectors)
+
+        while (iteration < maxIterations) {
+            iteration += 1
+            while (d < angles) {
+                val dQ = qualityGradient(eigenvectors, theta, ik, jk, angles, d)
+                d += 1
+            }
+        }
 
 
         return (DenseMatrix.zeros[Double](2, 2), 1.0, DenseMatrix.zeros[Double](2, 2))
@@ -123,5 +131,15 @@ package object serial {
         cost = 1.0 - (cost / eigenvectors.rows - 1.0) / eigenvectors.cols
 
         return cost
+    }
+
+    def qualityGradient(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int, index: Int): Double = {
+        var gradients = DenseVector.zeros[Double](eigenvectors.cols * eigenvectors.cols)
+        gradients(ik(index) + eigenvectors.cols * ik(index)) = -sin(theta(index))
+        gradients(ik(index) + eigenvectors.cols * jk(index)) = cos(theta(index))
+        gradients(jk(index) + eigenvectors.cols * ik(index)) = -cos(theta(index))
+        gradients(jk(index) + eigenvectors.cols * jk(index)) = -sin(theta(index))
+
+        return 1.0
     }
 }
