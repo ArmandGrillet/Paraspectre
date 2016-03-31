@@ -56,8 +56,8 @@ package object serial {
         while (row < matrix.rows) {
             var col = 0
             while (col < matrix.cols) {
-                if (matrix(row, col) == 0) {
-                    result(row, col) = 1
+                if (matrix(row, col) == 0.0) {
+                    result(row, col) = 1.0
                 }
                 col += 1
             }
@@ -105,8 +105,8 @@ package object serial {
 
     def alignmentQuality(eigenvectors: DenseMatrix[Double]): Double = {
         // Take the square of all entries and find the max of each row
-        val squareMatrix = square(eigenvectors)
-        val maxEachRow = max(squareMatrix(*, ::))
+        val squaredMatrix = eigenvectors :* eigenvectors // :* = Hadamard product
+        val maxEachRow = max(squaredMatrix(*, ::))
 
         // Compute cost
         var cost = 0.0
@@ -114,7 +114,7 @@ package object serial {
         while (row < eigenvectors.rows) {
             var col = 0
             while (col < eigenvectors.cols) {
-                cost += squareMatrix(row, col) / maxEachRow(row)
+                cost += squaredMatrix(row, col) / maxEachRow(row)
                 col += 1
             }
             row += 1
@@ -124,20 +124,4 @@ package object serial {
 
         return cost
     }
-
-    def square(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
-        var result = DenseMatrix.zeros[Double](matrix.rows, matrix.cols)
-        var row = 0
-        while (row < matrix.rows) {
-            var col = 0
-            while (col < matrix.cols) {
-                result(row, col) = matrix(row, col) * matrix(row, col)
-                col += 1
-            }
-            row += 1
-        }
-
-        return result
-    }
-
 }
