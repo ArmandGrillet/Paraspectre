@@ -152,20 +152,19 @@ package object serial {
         // Find the maximum of each row
         val squaredY = y :* y // :* = Hadamard product
         val maxEachRow = sqrt(max(squaredY(*, ::))) // Sqrt because in the original code max_values[i] = p_Y[ind];
-        val argMaxEachRow = sqrt(argmax(squaredY(*, ::)))
+        val argMaxEachRow = argmax(squaredY(*, ::)) // No sqrt because it is a position
         // Compute gradient
         var tmp1, tmp2, quality = 0.0
-        val flatA = a.toDenseVector
-        var row = 0
-        while (row < eigenvectors.rows) {
-            var col = 0
-            while (col < eigenvectors.cols) {
-                tmp1 = a(row, col) * y(row, col) / (maxEachRow(col) * maxEachRow(col))
-                tmp2 = 1.0
+        var col = 0
+        while (col < eigenvectors.cols) {
+            var row = 0
+            while (row < eigenvectors.rows) {
+                tmp1 = a(row, col) * y(row, col) / scala.math.pow(maxEachRow(row), 2)
+                tmp2 = a.toDenseVector(eigenvectors.rows * argMaxEachRow(row) + row) * squaredY(row, col) / scala.math.pow(maxEachRow(row), 3)
                 quality += tmp1 - tmp2
-                col += 1
+                row += 1
             }
-            row += 1
+            col += 1
         }
 
         return 2 * quality / eigenvectors.rows / eigenvectors.cols
