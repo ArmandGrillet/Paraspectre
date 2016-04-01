@@ -140,6 +140,35 @@ package object serial {
         gradients(jk(index) + eigenvectors.cols * ik(index)) = -cos(theta(index))
         gradients(jk(index) + eigenvectors.cols * jk(index)) = -sin(theta(index))
 
+        val u1 = uAB(theta, 0, index - 1, ik, jk, eigenvectors.cols)
+        val u2 = uAB(theta, index + 1, angles - 1, ik, jk, eigenvectors.cols)
         return 1.0
+    }
+
+    def uAB(theta: DenseVector[Double], a: Int, b: Int, ik: DenseVector[Int], jk: DenseVector[Int], dim: Int): DenseVector[Double] = {
+        // Set uab to be an identity matrix
+        var uab = DenseMatrix.eye[Double](dim).toDenseVector
+
+        if (b < a) {
+            return uab
+        }
+
+        var i, indexIk, indexJk = 0
+        var k = a
+        var tt, uIndex = 0.0
+        while (k <= b) {
+            tt = theta(k)
+            while (i < dim) {
+                indexIk = dim * ik(k) + i
+                indexJk = dim * jk(k) + i
+                uIndex = uab(indexIk) * cos(tt) - uab(indexJk) * sin(tt)
+                uab(indexJk) = uab(indexIk) * sin(tt) * uab(indexJk) * cos(tt)
+                uab(indexIk) = uIndex
+                i += 1
+            }
+            k += 1
+        }
+
+        return uab
     }
 }
