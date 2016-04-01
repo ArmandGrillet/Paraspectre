@@ -114,7 +114,7 @@ package object serial {
     def alignmentQuality(eigenvectors: DenseMatrix[Double]): Double = {
         // Take the square of all entries and find the max of each row
         val squaredMatrix = eigenvectors :* eigenvectors // :* = Hadamard product
-        val maxEachRow = max(squaredMatrix(*, ::))
+        val maxEachRow = max(squaredMatrix(*, ::)) // We do not add a sqrt() as in the original code max_values[i] = p_X[ind]*p_X[ind];
 
         // Compute cost
         var cost = 0.0
@@ -134,18 +134,41 @@ package object serial {
     }
 
     def qualityGradient(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int, index: Int): Double = {
-        // In C++ it is a 1D array but arr(rows * row + col) = mat(col, row)
+        // In C++ it is a 1D array but arr(rows * row + col) = mat(row, col)
         var gradients = DenseMatrix.zeros[Double](eigenvectors.cols, eigenvectors.cols)
         gradients(ik(index), ik(index)) = -sin(theta(index))
-        gradients(jk(index), ik(index)) = cos(theta(index))
-        gradients(ik(index), jk(index)) = -cos(theta(index))
+        gradients(ik(index), jk(index)) = cos(theta(index))
+        gradients(jk(index), ik(index)) = -cos(theta(index))
         gradients(jk(index), jk(index)) = -sin(theta(index))
 
         val u1 = uAB(theta, 0, index - 1, ik, jk, eigenvectors.cols)
         val u2 = uAB(theta, index + 1, angles - 1, ik, jk, eigenvectors.cols)
 
         val a = eigenvectors * gradients * u1 * u2
-        return 1.0
+
+        // Rotate vectors according to current angles.
+        val y = rotateEigenvectorsWithGivenRotation(eigenvectors, theta, ik, jk, angles)
+
+        // Find the maximum of each row
+        val squaredY = y :* y // :* = Hadamard product
+        val maxEachRow = sqrt(max(squaredY(*, ::))) // Sqrt because in the original code max_values[i] = p_Y[ind];
+        val argMaxEachRow = sqrt(argmax(squaredY(*, ::)))
+        // Compute gradient
+        var tmp1, tmp2, quality = 0.0
+        val flatA = a.toDenseVector
+        var row = 0
+        while (row < eigenvectors.rows) {
+            var col = 0
+            while (col < eigenvectors.cols) {
+                tmp1 = a(row, col) * y(row, col) / (maxEachRow(col) * maxEachRow(col))
+                tmp2 = 1.0
+                quality += tmp1 - tmp2
+                col += 1
+            }
+            row += 1
+        }
+
+        return 2 * quality / eigenvectors.rows / eigenvectors.cols
     }
 
     def uAB(theta: DenseVector[Double], a: Int, b: Int, ik: DenseVector[Int], jk: DenseVector[Int], dim: Int): DenseMatrix[Double] = {
@@ -162,14 +185,19 @@ package object serial {
         while (k <= b) {
             tt = theta(k)
             while (i < dim) {
-                uIndex = uab(i, ik(k)) * cos(tt) - uab(i, jk(k)) * sin(tt)
-                uab(i, jk(k)) = uab(i, ik(k)) * sin(tt) * uab(i, jk(k)) * cos(tt)
-                uab(i, ik(k)) = uIndex
+                uIndex = uab(ik(k), i) * cos(tt) - uab(jk(k), i) * sin(tt)
+                uab(jk(k), i) = uab(ik(k), i) * sin(tt) * uab(jk(k), i) * cos(tt)
+                uab(ik(k), i) = uIndex
                 i += 1
             }
             k += 1
         }
 
         return uab
+    }
+
+    def rotateEigenvectorsWithGivenRotation(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int): DenseMatrix[Double] = {
+        val g = uAB(theta, 0, angles - 1, ik, jk, eigenvectors.cols)
+        return eigenvectors * g
     }
 }
