@@ -68,7 +68,7 @@ package object serial {
     }
 
     def rotateEigenvectors(eigenvectors: DenseMatrix[Double]): (DenseMatrix[Double], Double, DenseMatrix[Double]) = {
-        // Only works in two dimensions now.
+        // Only works in two dimensions.
         val ndata = eigenvectors.rows
         val dim = eigenvectors.cols
 
@@ -134,36 +134,37 @@ package object serial {
     }
 
     def qualityGradient(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int, index: Int): Double = {
-        var gradients = DenseVector.zeros[Double](eigenvectors.cols * eigenvectors.cols)
-        gradients(ik(index) + eigenvectors.cols * ik(index)) = -sin(theta(index))
-        gradients(ik(index) + eigenvectors.cols * jk(index)) = cos(theta(index))
-        gradients(jk(index) + eigenvectors.cols * ik(index)) = -cos(theta(index))
-        gradients(jk(index) + eigenvectors.cols * jk(index)) = -sin(theta(index))
+        // In C++ it is a 1D array but arr(rows * row + col) = mat(col, row)
+        var gradients = DenseMatrix.zeros[Double](eigenvectors.cols, eigenvectors.cols)
+        gradients(ik(index), ik(index)) = -sin(theta(index))
+        gradients(jk(index), ik(index)) = cos(theta(index))
+        gradients(ik(index), jk(index)) = -cos(theta(index))
+        gradients(jk(index), jk(index)) = -sin(theta(index))
 
         val u1 = uAB(theta, 0, index - 1, ik, jk, eigenvectors.cols)
         val u2 = uAB(theta, index + 1, angles - 1, ik, jk, eigenvectors.cols)
+
+        val a = eigenvectors * gradients * u1 * u2
         return 1.0
     }
 
-    def uAB(theta: DenseVector[Double], a: Int, b: Int, ik: DenseVector[Int], jk: DenseVector[Int], dim: Int): DenseVector[Double] = {
+    def uAB(theta: DenseVector[Double], a: Int, b: Int, ik: DenseVector[Int], jk: DenseVector[Int], dim: Int): DenseMatrix[Double] = {
         // Set uab to be an identity matrix
-        var uab = DenseMatrix.eye[Double](dim).toDenseVector
+        var uab = DenseMatrix.eye[Double](dim)
 
         if (b < a) {
             return uab
         }
 
-        var i, indexIk, indexJk = 0
+        var i = 0
         var k = a
         var tt, uIndex = 0.0
         while (k <= b) {
             tt = theta(k)
             while (i < dim) {
-                indexIk = dim * ik(k) + i
-                indexJk = dim * jk(k) + i
-                uIndex = uab(indexIk) * cos(tt) - uab(indexJk) * sin(tt)
-                uab(indexJk) = uab(indexIk) * sin(tt) * uab(indexJk) * cos(tt)
-                uab(indexIk) = uIndex
+                uIndex = uab(i, ik(k)) * cos(tt) - uab(i, jk(k)) * sin(tt)
+                uab(i, jk(k)) = uab(i, ik(k)) * sin(tt) * uab(i, jk(k)) * cos(tt)
+                uab(i, ik(k)) = uIndex
                 i += 1
             }
             k += 1
