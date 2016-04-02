@@ -60,7 +60,7 @@ object Algorithm {
         var rotatedEigenvectors = DenseMatrix.zeros[Double](1, 1)
 
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
-        val (tempCluster, tempQuality, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+        val (tempQuality, tempClusters, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
 
         // In evrot.cpp originally
 
