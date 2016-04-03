@@ -55,13 +55,22 @@ object Algorithm {
         // end of evecs.m
 
         // In cluster_rotate.m originally
-        var cluster = DenseMatrix.zeros[Double](1, 1)
-        var quality = 0.0
-        var rotatedEigenvectors = DenseMatrix.zeros[Double](1, 1)
-
+        var qualities = scala.collection.mutable.MutableList[Double]()
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
-        val (tempQuality, tempClusters, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+        var (quality, clusters, rotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+        qualities += quality
 
+        var group = 0
+        for (group <- (minClusters + 1) to maxClusters) {
+            currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectors(::, 0 until group))
+            val (tempQuality, tempClusters, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+            rotatedEigenvectors = tempRotatedEigenvectors
+            qualities += tempQuality
+        }
+
+        val i = qualities.filter(quality => max(qualities) - quality <= 0.001)
+        val bestGroupIndex = i.last
+        println(bestGroupIndex)
         // In evrot.cpp originally
 
 

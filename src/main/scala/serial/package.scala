@@ -222,52 +222,73 @@ package object serial {
     }
 
     def assignCluster(rotatedEigenvectors: DenseMatrix[Double], ik: DenseVector[Int], jk: DenseVector[Int]): DenseVector[DenseVector[Double]] = {
-        val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
-        var maxEachRow = DenseVector.zeros[Double](rotatedEigenvectors.rows)
-        var argMaxEachRow = DenseVector.zeros[Int](rotatedEigenvectors.rows)
-        var clustersCount = DenseVector.zeros[Int](rotatedEigenvectors.cols)
+        // val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
+        // var maxEachRow = DenseVector.zeros[Double](rotatedEigenvectors.rows)
+        // var argMaxEachRow = DenseVector.zeros[Int](rotatedEigenvectors.rows)
+        // var clustersCount = DenseVector.zeros[Int](rotatedEigenvectors.cols)
+        //
+        // var col, row, ind = 0
+        // while (col < rotatedEigenvectors.cols) {
+        //     row = 0
+        //     while (row < rotatedEigenvectors.rows) {
+        //         if (col == 0) {
+        //             argMaxEachRow(row) = -1
+        //         }
+        //         if (maxEachRow(row) <= squaredVectors(row, col)) {
+        //             if (argMaxEachRow(row) >= 0) {
+        //                 clustersCount(argMaxEachRow(row)) -= 1
+        //             }
+        //             clustersCount(col) += 1
+        //             maxEachRow(row) = squaredVectors(row, col)
+        //             argMaxEachRow(row) = col
+        //         }
+        //         row += 1
+        //     }
+        //     col += 1
+        // }
+        //
+        // // Cluster assignments
+        // var clusterCells = DenseVector.zeros[DenseVector[Double]](rotatedEigenvectors.cols)
+        // var clusterSizes = new Array[Int](rotatedEigenvectors.cols)
+        //
+        // col = 0
+        // while (col < rotatedEigenvectors.cols) {
+        //     clusterCells(col) = DenseVector.zeros[Double](clustersCount(col))
+        //     if (col == 0) {
+        //         clusterSizes(col) = clustersCount(col)
+        //     } else {
+        //         clusterSizes(col) = clusterSizes(col - 1) + clustersCount(col)
+        //     }
+        //     col += 1
+        // }
+        //
+        // // Prepare cluster assignments
+        // col = 0
+        // while (col < rotatedEigenvectors.cols) {
+        //     row = 0
+        //     var cind = 0
+        //     while (row < rotatedEigenvectors.rows) {
+        //         if (argMaxEachRow(row) == col) {
+        //             val cindPos = positionInArray(cind, clusterSizes)
+        //             clusterCells(cindPos._1)(cindPos._2) = row + 1.0
+        //             cind += 1
+        //         }
+        //         row += 1
+        //     }
+        //     col += 1
+        // }
 
-        var col, row, ind = 0
-        while (col < rotatedEigenvectors.cols) {
-            row = 0
-            while (row < rotatedEigenvectors.rows) {
-                if (col == 0) {
-                    argMaxEachRow(row) = -1
-                }
-                if (maxEachRow(row) <= squaredVectors(row, col)) {
-                    if (argMaxEachRow(row) >= 0) {
-                        clustersCount(argMaxEachRow(row)) -= 1
-                    }
-                    clustersCount(col) += 1
-                    maxEachRow(row) = squaredVectors(row, col)
-                    argMaxEachRow(row) = col
-                }
-                row += 1
+        // return clusterCells
+        return DenseVector.zeros[DenseVector[Double]](rotatedEigenvectors.cols)
+    }
+
+    def positionInArray(value: Int, arr: Array[Int]): (Int, Int) = {
+        var pos = 0
+        for (pos <- (arr.length - 1) to 0 by -1) {
+            if (value >= arr(pos)) {
+                return (pos, arr(pos) - value)
             }
-            col += 1
         }
-
-        // Cluster assignments
-        var clusterCells = DenseVector.zeros[DenseVector[Double]](rotatedEigenvectors.cols)
-        col = 0
-        while (col < rotatedEigenvectors.cols) {
-            clusterCells(col) = DenseVector.zeros[Double](clustersCount(col))
-            col += 1
-        }
-
-        // Prepare cluster assignments
-        col = 0
-        while (col < rotatedEigenvectors.cols) {
-            row = 0
-            while (row < rotatedEigenvectors.rows) {
-                if (argMaxEachRow(row) == col) {
-                    clusterCells(col)(row) = row + 1.0
-                }
-                row += 1
-            }
-            col += 1
-        }
-
-        return clusterCells
+        return (0, value)
     }
 }
