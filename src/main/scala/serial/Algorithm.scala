@@ -14,7 +14,7 @@ object Algorithm {
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/0.csv").getPath()
+        val pathToMatrix = getClass.getResource("/2.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
@@ -69,7 +69,7 @@ object Algorithm {
             print(group)
             print(" clusters:\t")
             println(tempQuality)
-            if (tempQuality >= quality) {
+            if (tempQuality >= (quality - 0.001)) {
                 quality = tempQuality
                 clusters = tempClusters
             }

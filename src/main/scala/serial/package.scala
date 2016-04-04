@@ -97,15 +97,16 @@ package object serial {
         // Definitions
         val maxIterations = 200
         var iteration, d = 0
-        var q, qOld1, qOld2 = alignmentQuality(eigenvectors)
+        var q, qOld1, qOld2, qNew = alignmentQuality(eigenvectors, dim, ndata)
 
         while (iteration < maxIterations) {
             iteration += 1
+            d = 0
             while (d < angles) {
                 val dQ = qualityGradient(eigenvectors, theta, ik, jk, angles, d)
                 thetaNew(d) = theta(d) - dQ
-                val xRot = rotateEigenvectorsWithGivenRotation(eigenvectors, thetaNew, ik, jk, angles)
-                val qNew = alignmentQuality(xRot)
+                val rotatedEigenvectors = rotateEigenvectorsWithGivenRotation(eigenvectors, thetaNew, ik, jk, angles)
+                qNew = alignmentQuality(rotatedEigenvectors, dim, ndata)
                 if (qNew > q) {
                     theta(d) = thetaNew(d)
                     q = qNew
@@ -114,44 +115,37 @@ package object serial {
                 }
                 d += 1
             }
-            if (iteration > 2) { // Stopping criteria
-                if (q - qOld2 < 1e-3) {
-                    iteration = maxIterations
-                } else {
-                    qOld2 = qOld1
-                    qOld1 = q
-                }
+            if (iteration > 2 && (q - qOld2) < 1e-3) { // Stopping criteria
+                iteration = maxIterations
             } else {
                 qOld2 = qOld1
                 qOld1 = q
             }
         }
 
-        val xRot = rotateEigenvectorsWithGivenRotation(eigenvectors, thetaNew, ik, jk, angles)
-        val clusts = assignCluster(xRot, ik, jk)
-        return (q, clusts, xRot)
+        val rotatedEigenvectors = rotateEigenvectorsWithGivenRotation(eigenvectors, thetaNew, ik, jk, angles)
+        val clusts = assignCluster(rotatedEigenvectors, ik, jk, dim, ndata)
+        return (q, clusts, rotatedEigenvectors)
     }
 
-    def alignmentQuality(eigenvectors: DenseMatrix[Double]): Double = {
+    def alignmentQuality(eigenvectors: DenseMatrix[Double], dim: Int, ndata: Int): Double = {
         // Take the square of all entries and find the max of each row
         val squaredMatrix = eigenvectors :* eigenvectors // :* = Hadamard product
         val maxEachRow = max(squaredMatrix(*, ::)) // We do not add a sqrt() as in the original code max_values[i] = p_X[ind]*p_X[ind];
 
         // Compute cost
         var cost = 0.0
-        var row = 0
-        while (row < eigenvectors.rows) {
-            var col = 0
-            while (col < eigenvectors.cols) {
+        var col = 0
+        while (col < dim) {
+            var row = 0
+            while (row < ndata) {
                 cost += squaredMatrix(row, col) / maxEachRow(row)
-                col += 1
+                row += 1
             }
-            row += 1
+            col += 1
         }
 
-        cost = 1.0 - (cost / eigenvectors.rows - 1.0) / eigenvectors.cols
-
-        return cost
+        return (1.0 - (cost / ndata - 1.0) / dim)
     }
 
     def qualityGradient(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int, index: Int): Double = {
@@ -191,24 +185,24 @@ package object serial {
         return 2 * quality / eigenvectors.rows / eigenvectors.cols
     }
 
-    def uAB(theta: DenseVector[Double], a: Int, b: Int, ik: DenseVector[Int], jk: DenseVector[Int], dim: Int): DenseMatrix[Double] = {
+    def uAB(theta: DenseVector[Double], a: Int, b: Int, ik: DenseVector[Int], jk: DenseVector[Int], cols: Int): DenseMatrix[Double] = {
         // Set uab to be an identity matrix
-        var uab = DenseMatrix.eye[Double](dim)
+        var uab = DenseMatrix.eye[Double](cols)
 
         if (b < a) {
             return uab
         }
 
-        var i = 0
+        var col = 0
         var k = a
         var tt, uIndex = 0.0
         while (k <= b) {
             tt = theta(k)
-            while (i < dim) {
-                uIndex = uab(ik(k), i) * cos(tt) - uab(jk(k), i) * sin(tt)
-                uab(jk(k), i) = uab(ik(k), i) * sin(tt) * uab(jk(k), i) * cos(tt)
-                uab(ik(k), i) = uIndex
-                i += 1
+            while (col < cols) {
+                uIndex = uab(ik(k), col) * cos(tt) - uab(jk(k), col) * sin(tt)
+                uab(jk(k), col) = uab(ik(k), col) * sin(tt) * uab(jk(k), col) * cos(tt)
+                uab(ik(k), col) = uIndex
+                col += 1
             }
             k += 1
         }
@@ -218,68 +212,61 @@ package object serial {
 
     def rotateEigenvectorsWithGivenRotation(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int): DenseMatrix[Double] = {
         val g = uAB(theta, 0, angles - 1, ik, jk, eigenvectors.cols)
-        return eigenvectors * g
+        return (eigenvectors * g)
     }
 
-    def assignCluster(rotatedEigenvectors: DenseMatrix[Double], ik: DenseVector[Int], jk: DenseVector[Int]): DenseVector[DenseVector[Double]] = {
-        // val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
-        // var maxEachRow = DenseVector.zeros[Double](rotatedEigenvectors.rows)
-        // var argMaxEachRow = DenseVector.zeros[Int](rotatedEigenvectors.rows)
-        // var clustersCount = DenseVector.zeros[Int](rotatedEigenvectors.cols)
-        //
-        // var col, row, ind = 0
-        // while (col < rotatedEigenvectors.cols) {
-        //     row = 0
-        //     while (row < rotatedEigenvectors.rows) {
-        //         if (col == 0) {
-        //             argMaxEachRow(row) = -1
-        //         }
-        //         if (maxEachRow(row) <= squaredVectors(row, col)) {
-        //             if (argMaxEachRow(row) >= 0) {
-        //                 clustersCount(argMaxEachRow(row)) -= 1
-        //             }
-        //             clustersCount(col) += 1
-        //             maxEachRow(row) = squaredVectors(row, col)
-        //             argMaxEachRow(row) = col
-        //         }
-        //         row += 1
-        //     }
-        //     col += 1
-        // }
-        //
-        // // Cluster assignments
-        // var clusterCells = DenseVector.zeros[DenseVector[Double]](rotatedEigenvectors.cols)
-        // var clusterSizes = new Array[Int](rotatedEigenvectors.cols)
-        //
-        // col = 0
-        // while (col < rotatedEigenvectors.cols) {
-        //     clusterCells(col) = DenseVector.zeros[Double](clustersCount(col))
-        //     if (col == 0) {
-        //         clusterSizes(col) = clustersCount(col)
-        //     } else {
-        //         clusterSizes(col) = clusterSizes(col - 1) + clustersCount(col)
-        //     }
-        //     col += 1
-        // }
-        //
-        // // Prepare cluster assignments
-        // col = 0
-        // while (col < rotatedEigenvectors.cols) {
-        //     row = 0
-        //     var cind = 0
-        //     while (row < rotatedEigenvectors.rows) {
-        //         if (argMaxEachRow(row) == col) {
-        //             val cindPos = positionInArray(cind, clusterSizes)
-        //             clusterCells(cindPos._1)(cindPos._2) = row + 1.0
-        //             cind += 1
-        //         }
-        //         row += 1
-        //     }
-        //     col += 1
-        // }
+    def assignCluster(rotatedEigenvectors: DenseMatrix[Double], ik: DenseVector[Int], jk: DenseVector[Int], dim: Int, ndata: Int): DenseVector[DenseVector[Double]] = {
+        val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
+        var maxEachRow = DenseVector.zeros[Double](ndata)
+        var argMaxEachRow = DenseVector.zeros[Int](ndata)
+        var clustersCount = DenseVector.zeros[Int](dim)
 
-        // return clusterCells
-        return DenseVector.zeros[DenseVector[Double]](rotatedEigenvectors.cols)
+        var col, row = 0
+        while (col < dim) {
+            row = 0
+            while (row < ndata) {
+                if (col == 0) {
+                    argMaxEachRow(row) = -1
+                }
+                if (maxEachRow(row) <= squaredVectors(row, col)) {
+                    if (argMaxEachRow(row) >= 0) {
+                        clustersCount(argMaxEachRow(row)) -= 1
+                    }
+                    clustersCount(col) += 1
+                    maxEachRow(row) = squaredVectors(row, col)
+                    argMaxEachRow(row) = col
+                }
+                row += 1
+            }
+            col += 1
+        }
+
+        // Cluster assignments
+        var clusterCells = DenseVector.zeros[DenseVector[Double]](dim)
+
+        col = 0
+        while (col < dim) {
+            clusterCells(col) = DenseVector.zeros[Double](clustersCount(col))
+            col += 1
+        }
+
+        // Prepare cluster assignments
+        col = 0
+        var ind = 0
+        while (col < dim) {
+            row = 0
+            ind = 0
+            while (row < ndata) {
+                if (argMaxEachRow(row) == col) {
+                    clusterCells(col)(ind) = row + 1.0
+                    ind += 1
+                }
+                row += 1
+            }
+            col += 1
+        }
+
+        return clusterCells
     }
 
     def positionInArray(value: Int, arr: Array[Int]): (Int, Int) = {
