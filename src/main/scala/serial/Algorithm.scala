@@ -17,7 +17,7 @@ object Algorithm {
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/noob.csv").getPath()
+        val pathToMatrix = getClass.getResource("/0.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
@@ -57,8 +57,6 @@ object Algorithm {
         // In cluster_rotate.m originally
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
         var (quality, clusters, rotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
-
-        println(eigenvectors(::, 0).toDenseMatrix.t)
 
         print(minClusters)
         print(" clusters:\t")
