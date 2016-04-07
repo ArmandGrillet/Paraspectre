@@ -2,8 +2,11 @@ package serial
 
 import breeze.linalg._
 import breeze.numerics._
+import breeze.plot._
 import breeze.stats._
+import java.awt.{Color, Paint}
 import java.io.File
+import scala.io.Source
 
 object Algorithm {
     // Parameters.
@@ -14,40 +17,37 @@ object Algorithm {
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/2.csv").getPath()
+        val pathToMatrix = getClass.getResource("/noob.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
-        var matrix = breeze.linalg.csvread(matrixFile)
+        val originalMatrix = breeze.linalg.csvread(matrixFile)
 
         // Centralizing and scale the data.
-        val meancols = mean(matrix(::, *))
-        matrix = (matrix.t(::, *) - meancols.t).t // Waiting for fix scalanlp/breeze#450
+        val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
+        var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
         matrix /= max(abs(matrix))
 
-        // Build locally scaled affinity matrix.
+        // Build locally scaled affinity matrix (step 2).
         val distances = euclideanDistance(matrix)
         val locScale = localScale(distances, k)
         var locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
 
-        // Zero out diagonal
-        locallyScaledA = locallyScaledA :* logicalNot(DenseMatrix.eye[Double](matrix.rows)) // logicalNot = ~
-
-        // Build the normalized affinity matrix, in the paper but not the code.
-        // val diagonalMatrix = sum(locallyScaledA(*, ::))
-        // val normalizedA = diag(pow(diagonalMatrix, -0.5)) * locallyScaledA * diag(pow(diagonalMatrix, -0.5))
+        // Build the normalized affinity matrix.
+        val diagonalMatrix = sum(locallyScaledA(*, ::)) // Sum of each row (eigenvector)
+        val normalizedA = diag(pow(diagonalMatrix, -0.5)) * locallyScaledA * diag(pow(diagonalMatrix, -0.5))
 
         // In evecs.m originally
         // Compute the Laplacian
         // TODO : Use CSCMatrix if sparse affinity matrix.
         // Sum down each column
-        val sumAffinityMatrix = sum(locallyScaledA(::, *)) + DenseVector.fill(locallyScaledA.rows){eps}.t
-        val diagonal = diag(sqrt(DenseVector.ones[Double](locallyScaledA.rows).t :/ sumAffinityMatrix))
-        val laplacian = diagonal * locallyScaledA * diagonal
+        val sumCols = (sum(normalizedA(::, *)) :+ eps).t
+        val diagonal = diag(sqrt(DenseVector.ones[Double](sumCols.length) :/ sumCols))
+        val laplacian = diagonal * normalizedA * diagonal
 
         // Compute eigenvectors
         val svd.SVD(_, _, rightSingularVectors) = svd(laplacian)
-        val eigenvectors = rightSingularVectors(::, 0 until maxClusters)
+        val eigenvectors = rightSingularVectors(::, 0 to maxClusters)
 
         // Compute the eigenvalues
         // var eigenvalues = diag(eigenvectors)
@@ -57,13 +57,17 @@ object Algorithm {
         // In cluster_rotate.m originally
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
         var (quality, clusters, rotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+
+        println(eigenvectors(::, 0).toDenseMatrix.t)
+
         print(minClusters)
         print(" clusters:\t")
         println(quality)
 
         var group = 0
         for (group <- (minClusters + 1) to maxClusters) {
-            currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectors(::, 0 until group))
+            val eigenvectorToAdd = eigenvectors(::, group).toDenseMatrix.t
+            currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectorToAdd)
             val (tempQuality, tempClusters, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
             rotatedEigenvectors = tempRotatedEigenvectors
             print(group)
@@ -75,5 +79,19 @@ object Algorithm {
             }
         }
         // In evrot.cpp originally
+
+        // val f = Figure()
+        // val id2Color: Int => Paint = id => id match {
+        //     case 0 => Color.YELLOW
+        //     case 1 => Color.RED
+        //     case 2 => Color.GREEN
+        //     case 3 => Color.BLUE
+        //     case 4 => Color.GRAY
+        //     case _ => Color.BLACK
+        //   }
+        //
+        // f.subplot(0) +=  scatter(originalMatrix(::, 0), originalMatrix(::, 1), {(_:Int) => 1.0}, {(_:Int) => Color.BLACK})
+        // f.subplot(0).xlabel = "X-coordinate"
+        // f.subplot(0).ylabel = "Y-coordinate"
     }
 }

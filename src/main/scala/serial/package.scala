@@ -3,6 +3,16 @@ import breeze.numerics._
 import breeze.stats._
 
 package object serial {
+    def vertStack(matrix: DenseMatrix[Double], iterations: Int): DenseMatrix[Double] = {
+        var stack = matrix
+        var i = 0
+        while (i < iterations - 1) {
+            stack = DenseMatrix.vertcat(stack, matrix)
+            i += 1
+        }
+        return stack
+    }
+
     def euclideanDistance(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
         var distanceMatrix = DenseMatrix.zeros[Double](matrix.rows, matrix.rows) // Distance matrix, size rows x rows.
         var distanceVector = DenseVector(0.0).t // The distance vector containing the distance between two vectors.
@@ -69,11 +79,11 @@ package object serial {
 
     def rotateEigenvectors(eigenvectors: DenseMatrix[Double]): (Double, DenseVector[DenseVector[Double]], DenseMatrix[Double]) = {
         // Only works in two dimensions.
-        val ndata = eigenvectors.rows
-        val dim = eigenvectors.cols
+        val rows = eigenvectors.rows
+        val cols = eigenvectors.cols
 
         // Get the number of angles
-        val angles = (dim*(dim-1)/2).toInt
+        val angles = (cols*(cols-1)/2).toInt
         val theta, thetaNew = DenseVector.zeros[Double](angles)
 
         // We know that the method is 1
@@ -83,9 +93,9 @@ package object serial {
         var jk = DenseVector.zeros[Int](angles)
         var k = 0
         var i = 0
-        while (i < dim - 1) {
+        while (i < cols - 1) {
             var j = i + 1
-            while (j < dim) {
+            while (j < cols) {
                 ik(k) = i
                 jk(k) = j
                 k += 1
@@ -97,7 +107,7 @@ package object serial {
         // Definitions
         val maxIterations = 200
         var iteration, d = 0
-        var q, qOld1, qOld2, qNew = alignmentQuality(eigenvectors, dim, ndata)
+        var q, qOld1, qOld2, qNew = quality(eigenvectors, cols, rows)
 
         while (iteration < maxIterations) {
             iteration += 1
@@ -106,7 +116,7 @@ package object serial {
                 val dQ = qualityGradient(eigenvectors, theta, ik, jk, angles, d)
                 thetaNew(d) = theta(d) - dQ
                 val rotatedEigenvectors = rotateEigenvectorsWithGivenRotation(eigenvectors, thetaNew, ik, jk, angles)
-                qNew = alignmentQuality(rotatedEigenvectors, dim, ndata)
+                qNew = quality(rotatedEigenvectors, cols, rows)
                 if (qNew > q) {
                     theta(d) = thetaNew(d)
                     q = qNew
@@ -124,11 +134,11 @@ package object serial {
         }
 
         val rotatedEigenvectors = rotateEigenvectorsWithGivenRotation(eigenvectors, thetaNew, ik, jk, angles)
-        val clusts = assignCluster(rotatedEigenvectors, ik, jk, dim, ndata)
+        val clusts = assignCluster(rotatedEigenvectors, ik, jk, cols, rows)
         return (q, clusts, rotatedEigenvectors)
     }
 
-    def alignmentQuality(eigenvectors: DenseMatrix[Double], dim: Int, ndata: Int): Double = {
+    def quality(eigenvectors: DenseMatrix[Double], cols: Int, rows: Int): Double = {
         // Take the square of all entries and find the max of each row
         val squaredMatrix = eigenvectors :* eigenvectors // :* = Hadamard product
         val maxEachRow = max(squaredMatrix(*, ::)) // We do not add a sqrt() as in the original code max_values[i] = p_X[ind]*p_X[ind];
@@ -136,16 +146,16 @@ package object serial {
         // Compute cost
         var cost = 0.0
         var col = 0
-        while (col < dim) {
+        while (col < cols) {
             var row = 0
-            while (row < ndata) {
+            while (row < rows) {
                 cost += squaredMatrix(row, col) / maxEachRow(row)
                 row += 1
             }
             col += 1
         }
 
-        return (1.0 - (cost / ndata - 1.0) / dim)
+        return (1.0 - (cost / rows - 1.0) / cols)
     }
 
     def qualityGradient(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int, index: Int): Double = {
@@ -212,19 +222,20 @@ package object serial {
 
     def rotateEigenvectorsWithGivenRotation(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], ik: DenseVector[Int], jk: DenseVector[Int], angles: Int): DenseMatrix[Double] = {
         val g = uAB(theta, 0, angles - 1, ik, jk, eigenvectors.cols)
-        return (eigenvectors * g)
+        val rotatedEigenvectors = eigenvectors * g
+        return rotatedEigenvectors
     }
 
-    def assignCluster(rotatedEigenvectors: DenseMatrix[Double], ik: DenseVector[Int], jk: DenseVector[Int], dim: Int, ndata: Int): DenseVector[DenseVector[Double]] = {
+    def assignCluster(rotatedEigenvectors: DenseMatrix[Double], ik: DenseVector[Int], jk: DenseVector[Int], cols: Int, rows: Int): DenseVector[DenseVector[Double]] = {
         val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
-        var maxEachRow = DenseVector.zeros[Double](ndata)
-        var argMaxEachRow = DenseVector.zeros[Int](ndata)
-        var clustersCount = DenseVector.zeros[Int](dim)
+        var maxEachRow = DenseVector.zeros[Double](rows)
+        var argMaxEachRow = DenseVector.zeros[Int](rows)
+        var clustersCount = DenseVector.zeros[Int](cols)
 
         var col, row = 0
-        while (col < dim) {
+        while (col < cols) {
             row = 0
-            while (row < ndata) {
+            while (row < rows) {
                 if (col == 0) {
                     argMaxEachRow(row) = -1
                 }
@@ -242,10 +253,10 @@ package object serial {
         }
 
         // Cluster assignments
-        var clusterCells = DenseVector.zeros[DenseVector[Double]](dim)
+        var clusterCells = DenseVector.zeros[DenseVector[Double]](cols)
 
         col = 0
-        while (col < dim) {
+        while (col < cols) {
             clusterCells(col) = DenseVector.zeros[Double](clustersCount(col))
             col += 1
         }
@@ -253,10 +264,10 @@ package object serial {
         // Prepare cluster assignments
         col = 0
         var ind = 0
-        while (col < dim) {
+        while (col < cols) {
             row = 0
             ind = 0
-            while (row < ndata) {
+            while (row < rows) {
                 if (argMaxEachRow(row) == col) {
                     clusterCells(col)(ind) = row + 1.0
                     ind += 1
