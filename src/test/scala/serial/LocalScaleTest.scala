@@ -6,7 +6,6 @@ import breeze.numerics._
 import breeze.stats._
 
 class LocalScaleTest extends FlatSpec with Matchers {
-
     "The local scale " should "work with a 4x4 matrix and k = 5" in {
         val distanceMatrix = DenseMatrix((0.0, 4.0, 5.0, 3.0), (4.0, 0.0, 3.0, 5.0), (5.0, 3.0, 0.0, 4.0), (3.0, 5.0, 4.0, 0.0))
         val scale = localScale(distanceMatrix, 5)

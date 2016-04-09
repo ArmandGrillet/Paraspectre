@@ -12,12 +12,12 @@ object Algorithm {
     // Parameters.
     val k = 7 // K'th neighbor used in local scaling.
     val minClusters = 2 // Minimal number of clusters in the dataset.
-    val maxClusters = 4 // Maximal number of clusters in the dataset.
+    val maxClusters = 6 // Maximal number of clusters in the dataset.
     val eps = 2.2204e-16
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/1.csv").getPath()
+        val pathToMatrix = getClass.getResource("/4.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
@@ -56,9 +56,8 @@ object Algorithm {
 
         // In cluster_rotate.m originally
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
-        var (cost, clusters, rotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+        var (cost, clusters, rotatedEigenvectors) = paraspectre(currentEigenvectors)
 
-        println(rotatedEigenvectors)
         print(minClusters)
         print(" clusters:\t")
         println(cost)
@@ -67,7 +66,7 @@ object Algorithm {
         for (group <- (minClusters + 1) to maxClusters) {
             val eigenvectorToAdd = eigenvectors(::, group).toDenseMatrix.t
             currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectorToAdd)
-            val (tempCost, tempClusters, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+            val (tempCost, tempClusters, tempRotatedEigenvectors) = paraspectre(currentEigenvectors)
             rotatedEigenvectors = tempRotatedEigenvectors
             print(group)
             print(" clusters:\t")
