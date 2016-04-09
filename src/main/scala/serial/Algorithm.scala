@@ -12,12 +12,12 @@ object Algorithm {
     // Parameters.
     val k = 7 // K'th neighbor used in local scaling.
     val minClusters = 2 // Minimal number of clusters in the dataset.
-    val maxClusters = 6 // Maximal number of clusters in the dataset.
+    val maxClusters = 4 // Maximal number of clusters in the dataset.
     val eps = 2.2204e-16
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/0.csv").getPath()
+        val pathToMatrix = getClass.getResource("/1.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
@@ -56,23 +56,24 @@ object Algorithm {
 
         // In cluster_rotate.m originally
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
-        var (quality, clusters, rotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+        var (cost, clusters, rotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
 
+        println(rotatedEigenvectors)
         print(minClusters)
         print(" clusters:\t")
-        println(quality)
+        println(cost)
 
         var group = 0
         for (group <- (minClusters + 1) to maxClusters) {
             val eigenvectorToAdd = eigenvectors(::, group).toDenseMatrix.t
             currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectorToAdd)
-            val (tempQuality, tempClusters, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
+            val (tempCost, tempClusters, tempRotatedEigenvectors) = rotateEigenvectors(currentEigenvectors)
             rotatedEigenvectors = tempRotatedEigenvectors
             print(group)
             print(" clusters:\t")
-            println(tempQuality)
-            if (tempQuality >= (quality - 0.001)) {
-                quality = tempQuality
+            println(tempCost)
+            if (tempCost <= (cost + 0.001)) {
+                cost = tempCost
                 clusters = tempClusters
             }
         }
