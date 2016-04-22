@@ -13,7 +13,6 @@ object Algorithm {
     val k = 7 // K'th neighbor used in local scaling.
     val minClusters = 2 // Minimal number of clusters in the dataset.
     val maxClusters = 6 // Maximal number of clusters in the dataset.
-    val eps = 2.2204e-16
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
@@ -24,24 +23,27 @@ object Algorithm {
         val originalMatrix = breeze.linalg.csvread(matrixFile)
 
         // Centralizing and scale the data.
-        val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
-        var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
-        matrix /= max(abs(matrix))
+        // val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
+        // var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
+        // matrix /= max(abs(matrix))
+        val matrix = originalMatrix
 
-        // Build locally scaled affinity matrix (step 2).
+        // Compute local scale (step 1).
         val distances = euclideanDistance(matrix)
         val locScale = localScale(distances, k)
+
+        // Build locally scaled affinity matrix (step 2).
         var locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
 
-        // Build the normalized affinity matrix.
-        val diagonalMatrix = sum(locallyScaledA(*, ::)) // Sum of each row (eigenvector)
-        val normalizedA = diag(pow(diagonalMatrix, -0.5)) * locallyScaledA * diag(pow(diagonalMatrix, -0.5))
+        // Build the normalized affinity matrix (step 3)
+        val diagonalMatrix = diag(pow(sum(locallyScaledA(*, ::)), -0.5)) // Sum of each row, then power -0.5, then matrix.
+        val normalizedA = diagonalMatrix * locallyScaledA * diagonalMatrix
 
         // In evecs.m originally
         // Compute the Laplacian
         // TODO : Use CSCMatrix if sparse affinity matrix.
         // Sum down each column
-        val sumCols = (sum(normalizedA(::, *)) :+ eps).t
+        val sumCols = (sum(normalizedA(::, *)) :+ java.lang.Double.MIN_VALUE).t
         val diagonal = diag(sqrt(DenseVector.ones[Double](sumCols.length) :/ sumCols))
         val laplacian = diagonal * normalizedA * diagonal
 

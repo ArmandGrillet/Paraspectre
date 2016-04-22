@@ -30,7 +30,7 @@ package object serial {
     }
 
     def localScale(distanceMatrix: DenseMatrix[Double], k: Int): DenseVector[Double] = {
-        if (k >= distanceMatrix.cols - 1) {
+        if (k > distanceMatrix.cols - 1) {
             return max(distanceMatrix(*, ::)) // Maximum distance.
         } else {
             var localScale = DenseVector.zeros[Double](distanceMatrix.cols)
@@ -38,7 +38,7 @@ package object serial {
 
             (0 until distanceMatrix.cols).map{col =>
                 sortedVector = distanceMatrix(::, col).toArray.sorted
-                localScale(col) = sortedVector(k) // Kth nearest distance.
+                localScale(col) = sortedVector(k) // Kth nearest distance., the 0th neighbor is always 0 and sortedVector(1) is the first neighbor
             }
 
             return localScale
@@ -46,14 +46,14 @@ package object serial {
     }
 
     def locallyScaledAffinityMatrix(distanceMatrix: DenseMatrix[Double], localScale: DenseVector[Double]): DenseMatrix[Double] = {
-        var affinityMatrix = DenseMatrix.zeros[Double](distanceMatrix.rows, distanceMatrix.rows) // Distance matrix, size rows x rows.
+        var affinityMatrix = DenseMatrix.zeros[Double](distanceMatrix.rows, distanceMatrix.cols) // Distance matrix, size rows x cols.
 
-        (0 until distanceMatrix.rows).map{ mainRow =>
-            (mainRow + 1 until distanceMatrix.rows).map{ secondRow =>
-                affinityMatrix(mainRow, secondRow) = -scala.math.pow(distanceMatrix(mainRow, secondRow), 2) // -d(si, sj)²
-                affinityMatrix(mainRow, secondRow) = affinityMatrix(mainRow, secondRow) / (localScale(mainRow) * localScale(secondRow)) // -d(si, sj)² / lambi * lambj
-                affinityMatrix(mainRow, secondRow) = scala.math.exp(affinityMatrix(mainRow, secondRow)) // exp(-d(si, sj)² / lambi * lambj)
-                affinityMatrix(secondRow, mainRow) = affinityMatrix(mainRow, secondRow)
+        (0 until distanceMatrix.rows).map{ row =>
+            (row + 1 until distanceMatrix.cols).map{ col =>
+                affinityMatrix(row, col) = -scala.math.pow(distanceMatrix(row, col), 2) // -d(si, sj)²
+                affinityMatrix(row, col) /= (localScale(row) * localScale(col)) // -d(si, sj)² / lambi * lambj
+                affinityMatrix(row, col) = scala.math.exp(affinityMatrix(row, col)) // exp(-d(si, sj)² / lambi * lambj)
+                affinityMatrix(col, row) = affinityMatrix(row, col)
             }
         }
 
