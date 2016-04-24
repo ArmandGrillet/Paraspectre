@@ -1,6 +1,9 @@
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats._
+import breeze.plot._
+import java.awt.{Color, Paint}
+import org.jfree.chart.axis.{NumberTickUnit, TickUnits}
 
 package object serial {
     def vertStack(matrix: DenseMatrix[Double], iterations: Int): DenseMatrix[Double] = {
@@ -58,6 +61,19 @@ package object serial {
         }
 
         return affinityMatrix
+    }
+
+    def printVector(vector: DenseVector[Double]) {
+        val f = Figure()
+        val p = f.subplot(0)
+        p.title = "First 10 eigenvalues of L"
+        p.xlim(0, vector.length - 1)
+        p.ylim(0.9, 1.01)
+        p.yaxis.setTickUnit(new NumberTickUnit(0.01));
+
+        val xVector = linspace(0, vector.length - 1, vector.length)
+
+        p += scatter(xVector, vector, {(_:Int) => 0.3}, {(_:Int) => Color.RED}) // Display the observations.
     }
 
     def logicalNot(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {

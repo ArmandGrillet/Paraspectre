@@ -16,17 +16,17 @@ object Algorithm {
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/4.csv").getPath()
+        val pathToMatrix = getClass.getResource("/5.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
         val originalMatrix = breeze.linalg.csvread(matrixFile)
 
         // Centralizing and scale the data.
-        // val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
-        // var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
-        // matrix /= max(abs(matrix))
-        val matrix = originalMatrix
+        val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
+        var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
+        matrix /= max(abs(matrix))
+        // val matrix = originalMatrix
 
         // Compute local scale (step 1).
         val distances = euclideanDistance(matrix)
@@ -39,22 +39,37 @@ object Algorithm {
         val diagonalMatrix = diag(pow(sum(locallyScaledA(*, ::)), -0.5)) // Sum of each row, then power -0.5, then matrix.
         val normalizedA = diagonalMatrix * locallyScaledA * diagonalMatrix
 
-        // In evecs.m originally
-        // Compute the Laplacian
-        // TODO : Use CSCMatrix if sparse affinity matrix.
-        // Sum down each column
-        val sumCols = (sum(normalizedA(::, *)) :+ java.lang.Double.MIN_VALUE).t
-        val diagonal = diag(sqrt(DenseVector.ones[Double](sumCols.length) :/ sumCols))
-        val laplacian = diagonal * normalizedA * diagonal
+        // Copy of the beginning of SpectralClustering.cpp
+        // val sumRows = sum(normalizedA(::, *))
+        // val diag = DenseMatrix.zeros[Double](normalizedA.rows, normalizedA.cols)
+        // for (col <- 0 to normalizedA.cols) {
+        //     diag(col, col) = 1 / sqrt(sumRows(col))
+        // }
+        // val laplacian = diag * normalizedA * diag
 
         // Compute eigenvectors
-        val svd.SVD(_, _, rightSingularVectors) = svd(laplacian)
-        val eigenvectors = rightSingularVectors(::, 0 to maxClusters)
+        val eigenstuff = eig(normalizedA)
+        var eigenvalues = eigenstuff.eigenvalues // DenseVector
+        var eigenvectors = eigenstuff.eigenvectors // DenseMatrix
 
-        // Compute the eigenvalues
-        // var eigenvalues = diag(eigenvectors)
-        // eigenvalues = eigenvalues(0 until maxClusters)
-        // end of evecs.m
+        var col, row = 0
+        for (col <- 0 until eigenvalues.length) { // until = to - 1
+            val k = argmax(eigenvalues(col until normalizedA.cols))
+            if (k > 0) {
+                val tempValue = eigenvalues(col)
+                eigenvalues(col) = eigenvalues(k + col)
+                eigenvalues(k + col) = tempValue
+
+                val tempVector = eigenvectors(::, col)
+                for (row <- 0 until eigenvectors.rows) {
+                    eigenvectors(row, col) = eigenvectors(row, k + col)
+                    eigenvectors(row, k + col) = tempVector(row)
+                }
+            }
+        }
+
+        // printVector(eigenvalues(0 to 10))
+        eigenvectors = eigenvectors(::, 0 until maxClusters)
 
         // In cluster_rotate.m originally
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
@@ -65,12 +80,12 @@ object Algorithm {
         println(cost)
 
         var group = 0
-        for (group <- (minClusters + 1) to maxClusters) {
+        for (group <- minClusters until maxClusters) {
             val eigenvectorToAdd = eigenvectors(::, group).toDenseMatrix.t
             currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectorToAdd)
             val (tempCost, tempClusters, tempRotatedEigenvectors) = paraspectre(currentEigenvectors)
             rotatedEigenvectors = tempRotatedEigenvectors
-            print(group)
+            print(group + 1)
             print(" clusters:\t")
             println(tempCost)
             if (tempCost <= (cost + 0.001)) {

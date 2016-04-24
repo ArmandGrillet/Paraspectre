@@ -4,7 +4,7 @@ version := "1.0"
 
 scalaVersion := "2.11.8"
 
-libraryDependencies  ++= Seq(
+libraryDependencies ++= Seq(
     // other dependencies here
     "org.scalanlp" %% "breeze" % "0.12",
     // native libraries are not included by default. add this if you want them (as of 0.7)
