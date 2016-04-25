@@ -50,25 +50,22 @@ object Algorithm {
         // Compute eigenvectors
         val eigenstuff = eig(normalizedA)
         var eigenvalues = eigenstuff.eigenvalues // DenseVector
-        var eigenvectors = eigenstuff.eigenvectors // DenseMatrix
+        val unsortedEigenvectors = eigenstuff.eigenvectors // DenseMatrix
+        var eigenvectors = DenseMatrix.zeros[Double](unsortedEigenvectors.rows, maxClusters)
+        var vectorToDisplay = DenseVector.zeros[Double](maxClusters)
 
-        var col, row = 0
-        for (col <- 0 until eigenvalues.length) { // until = to - 1
-            val k = argmax(eigenvalues(col until normalizedA.cols))
-            if (k > 0) {
-                val tempValue = eigenvalues(col)
-                eigenvalues(col) = eigenvalues(k + col)
-                eigenvalues(k + col) = tempValue
-
-                val tempVector = eigenvectors(::, col)
-                for (row <- 0 until eigenvectors.rows) {
-                    eigenvectors(row, col) = eigenvectors(row, k + col)
-                    eigenvectors(row, k + col) = tempVector(row)
-                }
+        var i = 0
+        val minEigenvalue = min(eigenvalues)
+        for (i <- 0 until maxClusters) {
+            val indexBiggestEigenvalue = argmax(eigenvalues)
+            vectorToDisplay(i) = eigenvalues(indexBiggestEigenvalue)
+            eigenvalues(indexBiggestEigenvalue) = minEigenvalue
+            for (row <- 0 until unsortedEigenvectors.rows) {
+                eigenvectors(row, i) = unsortedEigenvectors(row, indexBiggestEigenvalue)
             }
         }
 
-        // printVector(eigenvalues(0 to 10))
+        // printVector(vectorToDisplay)
         eigenvectors = eigenvectors(::, 0 until maxClusters)
 
         // In cluster_rotate.m originally
