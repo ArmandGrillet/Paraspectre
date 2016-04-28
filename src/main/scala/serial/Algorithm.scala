@@ -39,26 +39,18 @@ object Algorithm {
         val diagonalMatrix = diag(pow(sum(locallyScaledA(*, ::)), -0.5)) // Sum of each row, then power -0.5, then matrix.
         val normalizedA = diagonalMatrix * locallyScaledA * diagonalMatrix
 
-        // Copy of the beginning of SpectralClustering.cpp
-        // val sumRows = sum(normalizedA(::, *))
-        // val diag = DenseMatrix.zeros[Double](normalizedA.rows, normalizedA.cols)
-        // for (col <- 0 to normalizedA.cols) {
-        //     diag(col, col) = 1 / sqrt(sumRows(col))
-        // }
-        // val laplacian = diag * normalizedA * diag
-
-        // Compute eigenvectors
+        // Compute the biggest eigenvectors
         val eigenstuff = eig(normalizedA)
         var eigenvalues = eigenstuff.eigenvalues // DenseVector
         val unsortedEigenvectors = eigenstuff.eigenvectors // DenseMatrix
         var eigenvectors = DenseMatrix.zeros[Double](unsortedEigenvectors.rows, maxClusters)
-        var vectorToDisplay = DenseVector.zeros[Double](maxClusters)
+        // var vectorToDisplay = DenseVector.zeros[Double](maxClusters)
 
         var i = 0
         val minEigenvalue = min(eigenvalues)
         for (i <- 0 until maxClusters) {
             val indexBiggestEigenvalue = argmax(eigenvalues)
-            vectorToDisplay(i) = eigenvalues(indexBiggestEigenvalue)
+            // vectorToDisplay(i) = eigenvalues(indexBiggestEigenvalue)
             eigenvalues(indexBiggestEigenvalue) = minEigenvalue
             for (row <- 0 until unsortedEigenvectors.rows) {
                 eigenvectors(row, i) = unsortedEigenvectors(row, indexBiggestEigenvalue)
@@ -66,7 +58,6 @@ object Algorithm {
         }
 
         // printVector(vectorToDisplay)
-        eigenvectors = eigenvectors(::, 0 until maxClusters)
 
         // In cluster_rotate.m originally
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
