@@ -6,6 +6,8 @@ import java.awt.{Color, Paint}
 import org.jfree.chart.axis.{NumberTickUnit, TickUnits}
 
 package object serial {
+    // Miscellanous functions
+
     def vertStack(matrix: DenseMatrix[Double], iterations: Int): DenseMatrix[Double] = {
         var stack = matrix
         var i = 0
@@ -76,6 +78,16 @@ package object serial {
         p += scatter(xVector, vector, {(_:Int) => 0.3}, {(_:Int) => Color.RED}) // Display the observations.
     }
 
+    def printClusters(matrix: DenseMatrix[Double], clusters: DenseVector[Int]) {
+        val colors = List(Color.RED, Color.GREEN, Color.BLUE, Color.BLACK, Color.MAGENTA, Color.CYAN, Color.YELLOW)
+
+        val f = Figure()
+        val p = f.subplot(0)
+        p.title = "Clusters"
+
+        p += scatter(matrix(::, 0), matrix(::, 1), {(_:Int) => 0.01}, {(pos:Int) => colors(clusters(pos))}) // Display the observations.
+    }
+
     def logicalNot(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
         return DenseMatrix.tabulate(matrix.rows, matrix.cols){
             case (row, col) =>
@@ -87,139 +99,154 @@ package object serial {
         }
     }
 
+    // Self-tuning spectral clustering last steps
+    var dims = 0
+    var data = 0
+    var angles = 0
+    var ik, jk = DenseVector.zeros[Int](0)
+    var ev = DenseMatrix.zeros[Double](0, 0)
+
     def paraspectre(eigenvectors: DenseMatrix[Double]): (Double, DenseVector[Int], DenseMatrix[Double]) = {
-        // Get the number of angles
-        val angles = (eigenvectors.cols * (eigenvectors.cols-1) / 2).toInt
+        dims = eigenvectors.cols
+        data = eigenvectors.rows
+        angles = (dims * (dims - 1) / 2).toInt
+        ik = DenseVector.zeros[Int](angles)
+        jk = DenseVector.zeros[Int](angles)
+        ev = eigenvectors
+
+        var i, j, k = 0
+        for (i <- 0 until dims) {
+            for (j <- (i + 1) until dims) {
+                ik(k) = i
+                jk(k) = j
+                k += 1
+            }
+        }
+
         val maxIterations = 200
-        var angle = 0
-        val theta, newTheta = DenseVector.zeros[Double](angles)
+        val alpha = 1.0
+        var dQ, q, qNew, qOld1, qOld2, qUp, qDown = 0.0
+        var iter, d = 0
 
-        // Definitions
-        val stepSize = 1.0
-        var penultimateCost, lastCost, currentCost, newCost = cost(eigenvectors)
-        var rotatedEigenvectors = DenseMatrix.zeros[Double](0, 0)
+        var theta, thetaNew = DenseVector.zeros[Double](angles)
 
-        var iteration = 0
-        while (iteration < maxIterations) {
-            iteration += 1
-            for (angle <- 0 until angles) {
-                val gradient = stochasticGradient(eigenvectors, theta, angles, angle)
-                newTheta(angle) = theta(angle) - stepSize * gradient
-                rotatedEigenvectors = givensRotate(eigenvectors, newTheta, angles)
-                newCost = cost(rotatedEigenvectors)
-                if (newCost < currentCost) {
-                    theta(angle) = newTheta(angle)
-                    currentCost = newCost
+        q = evaluateQuality(ev)
+        qOld1 = q
+        qOld2 = q
+        while (iter < maxIterations) {
+            iter += 1
+            for (d <- 0 until angles) {
+                dQ = evaluateQualityGradient(theta, d)
+                thetaNew(d) = theta(d) - alpha * dQ
+                val evRot = rotateGivens(thetaNew)
+                qNew = evaluateQuality(evRot)
+
+                if (qNew > q) {
+                    theta(d) = thetaNew(d)
+                    q = qNew
                 } else {
-                    newTheta(angle) = theta(angle)
+                    thetaNew(d) = theta(d)
                 }
             }
-            if (iteration > 2 && abs(currentCost - penultimateCost) < 1e-3) { // Stopping criteria
-                iteration = maxIterations
+
+            if (iter > 2 && ((q - qOld2) < 1e-3)) {
+                iter = maxIterations
             } else {
-                penultimateCost = lastCost
-                lastCost = currentCost
+                qOld2 = qOld1
+                qOld1 = q
             }
         }
 
-        rotatedEigenvectors = givensRotate(eigenvectors, newTheta, angles)
-        val clusts = clusters(rotatedEigenvectors)
-        return (currentCost, clusts, rotatedEigenvectors)
+        val finalEvRot = rotateGivens(thetaNew)
+        val clusts = clusters(finalEvRot)
+        return (q, clusts, finalEvRot)
     }
 
-    // Sum of each row divided by the maximum of each row.
-    def cost(rotatedMatrix: DenseMatrix[Double]): Double = {
-        val squaredMatrix = rotatedMatrix :* rotatedMatrix
-        return sum(sum(squaredMatrix(*, ::)) / max(squaredMatrix(*, ::)))
+    def clusters(rotatedEigenvectors: DenseMatrix[Double]): DenseVector[Int] = {
+        val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
+        return argmax(squaredVectors(*, ::))
     }
 
-    // Position i,j of an index in a col*col matrix.
-    def upperIndex(cols: Int, index: Int): (Int, Int) = {
-        var idx, i, j = 0
-        while (i < cols - 1) {
-            j = i + 1
-            while (j < cols) {
-                if (idx == index) {
-                    return (i, j)
-                }
-                j += 1
-                idx += 1
+    def evaluateQuality(x: DenseMatrix[Double]): Double = {
+        // Take the square of all entries and find the max of each row
+        var x2 = pow(x, 2)
+        val maxValues = max(x2(*, ::)) // Max of each row
+
+        // Compute cost
+        var row, col = 0
+        for (row <- 0 until data) {
+            for (col <- 0 until dims) {
+                x2(row, col) /= maxValues(row)
             }
-            i += 1
         }
-        return (0, 0)
+
+        val j = 1.0 - (sum(x2) / data - 1.0) / dims
+        return j
     }
 
-    def stochasticGradient(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], angles: Int, angle: Int): Double = {
-        // In C++ it is a 1D array but arr(rows * row + col) = mat(row, col)
-        var gradients = DenseMatrix.zeros[Double](eigenvectors.cols, eigenvectors.cols)
-        val (i, j) = upperIndex(eigenvectors.cols, angle)
-        gradients(i, i) = -sin(theta(angle))
-        gradients(j, i) = cos(theta(angle))
-        gradients(i, j) = -cos(theta(angle))
-        gradients(j, j) = -sin(theta(angle))
+    def evaluateQualityGradient(theta: DenseVector[Double], angle: Int): Double = {
+        // Build V, U, A
+        val v = gradU(theta, angle)
+        val u1 = uAB(theta, 0, angle - 1)
+        val u2 = uAB(theta, angle + 1, angles -1)
 
-        val u1 = uAB(theta, 0, angle - 1, eigenvectors.cols)
-        val u2 = uAB(theta, angle + 1, angles - 1, eigenvectors.cols)
+        val a = ev * u1 * v * u2
 
-        val a = eigenvectors * u1 * gradients * u2
+        val y = rotateGivens(theta)
 
-        // Rotate vectors according to angles.
-        val y = givensRotate(eigenvectors, theta, angles)
-
-        // Find the maximum of each row
-        val squaredY = y :* y // :* = Hadamard product
-        val maxEachRow = sqrt(max(squaredY(*, ::))) // Sqrt because in the original code max_values[i] = p_Y[ind];
-        val argMaxEachRow = argmax(squaredY(*, ::)) // No sqrt because it is a position
+        val maxValues = max(y(*, ::)) // Max of each row
+        val maxIndexCol = argmax(y(*, ::))
 
         // Compute gradient
-        var tmp1, tmp2, quality = 0.0
-        var col = 0
-        while (col < eigenvectors.cols) {
-            var row = 0
-            while (row < eigenvectors.rows) {
-                tmp1 = a(row, col) * y(row, col) / scala.math.pow(maxEachRow(row), 2)
-                tmp2 = a.toDenseVector(eigenvectors.rows * argMaxEachRow(row) + row) * squaredY(row, col) / scala.math.pow(maxEachRow(row), 3)
-                quality += tmp1 - tmp2
-                row += 1
+        var dJ, tmp1, tmp2 = 0.0
+        var i, j = 0
+        for (j <- 0 until dims) { // Loop over all columns
+            for (i <- 0 until data) { // Loop over all rows
+                tmp1 = a(i, j) * y(i, j) / (maxValues(i) * maxValues(i))
+                tmp2 = a(i, maxIndexCol(i)) * pow(y(i, j), 2) / pow(maxValues(i), 3)
+                dJ += tmp1 - tmp2
             }
-            col += 1
         }
+        dJ = 2 * dJ / data / dims
 
-        return 2 * quality / eigenvectors.rows / eigenvectors.cols
+        return dJ
     }
 
-    def uAB(theta: DenseVector[Double], a: Int, b: Int, cols: Int): DenseMatrix[Double] = {
-        // Set uab to be an identity matrix
-        var uab = DenseMatrix.eye[Double](cols)
+    def rotateGivens(theta: DenseVector[Double]): DenseMatrix[Double] = {
+        val g = uAB(theta, 0, angles -1)
+        val y = ev * g
+        return y
+    }
+
+    def uAB(theta: DenseVector[Double], a: Int, b: Int): DenseMatrix[Double] = {
+        var i, k = 0
+        var uab = DenseMatrix.eye[Double](dims)
 
         if (b < a) {
             return uab
         }
 
-        var k = a
-        var tt, uIndex = 0.0
-        for (k <- a to b) {
+        var tt, uIk = 0.0
+        for (k <- 0 to b) {
             tt = theta(k)
-            val (i, j) = upperIndex(cols, k)
-            var col = 0
-            for (col <- 0 until cols) {
-                uIndex = uab(i, col) * cos(tt) - uab(j, col) * sin(tt)
-                uab(j, col) = uab(i, col) * sin(tt) * uab(j, col) * cos(tt)
-                uab(i, col) = uIndex
+            for (i <- 0 until dims) {
+                uIk = uab(i, ik(k)) * cos(tt) - uab(i, jk(k)) * sin(tt)
+                uab(i, jk(k)) = uab(i, ik(k)) * sin(tt) + uab(i, jk(k)) * cos(tt)
+                uab(i, ik(k)) = uIk
             }
         }
 
         return uab
     }
 
-    def givensRotate(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], angles: Int): DenseMatrix[Double] = {
-        val g = uAB(theta, 0, angles - 1, eigenvectors.cols)
-        return eigenvectors * g
-    }
+    def gradU(theta: DenseVector[Double], k: Int): DenseMatrix[Double] = {
+        val v = DenseMatrix.zeros[Double](dims, dims)
 
-    def clusters(rotatedEigenvectors: DenseMatrix[Double]): DenseVector[Int] = {
-        val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
-        return argmax(squaredVectors(*, ::))
+        v(ik(k),ik(k)) = -sin(theta(k))
+    	v(ik(k),jk(k)) = cos(theta(k))
+    	v(jk(k),ik(k)) = -cos(theta(k))
+    	v(jk(k),jk(k)) = -sin(theta(k))
+
+        return v
     }
 }

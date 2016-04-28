@@ -16,17 +16,17 @@ object Algorithm {
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/noob.csv").getPath()
+        val pathToMatrix = getClass.getResource("/5.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
         val originalMatrix = breeze.linalg.csvread(matrixFile)
 
         // Centralizing and scale the data.
-        // val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
-        // var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
-        // matrix /= max(abs(matrix))
-        val matrix = originalMatrix
+        val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
+        var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
+        matrix /= max(abs(matrix))
+        // val matrix = originalMatrix
 
         // Compute local scale (step 1).
         val distances = euclideanDistance(matrix)
@@ -61,25 +61,28 @@ object Algorithm {
 
         // In cluster_rotate.m originally
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
-        var (cost, clusters, rotatedEigenvectors) = paraspectre(currentEigenvectors)
+        var (quality, clusters, rotatedEigenvectors) = paraspectre(currentEigenvectors)
 
         print(minClusters)
         print(" clusters:\t")
-        println(cost)
+        println(quality)
 
         var group = 0
         for (group <- minClusters until maxClusters) {
             val eigenvectorToAdd = eigenvectors(::, group).toDenseMatrix.t
             currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectorToAdd)
-            val (tempCost, tempClusters, tempRotatedEigenvectors) = paraspectre(currentEigenvectors)
+            val (tempQuality, tempClusters, tempRotatedEigenvectors) = paraspectre(currentEigenvectors)
             rotatedEigenvectors = tempRotatedEigenvectors
             print(group + 1)
             print(" clusters:\t")
-            println(tempCost)
-            if (tempCost <= (cost + 0.001)) {
-                cost = tempCost
+            println(tempQuality)
+
+            if (tempQuality >= quality) {
+                quality = tempQuality
                 clusters = tempClusters
             }
         }
+
+        printClusters(originalMatrix, clusters)
     }
 }
