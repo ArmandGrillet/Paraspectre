@@ -90,20 +90,22 @@ package object serial {
     def paraspectre(eigenvectors: DenseMatrix[Double]): (Double, DenseVector[Int], DenseMatrix[Double]) = {
         // Get the number of angles
         val angles = (eigenvectors.cols * (eigenvectors.cols-1) / 2).toInt
+        val maxIterations = 200
+        var angle = 0
         val theta, newTheta = DenseVector.zeros[Double](angles)
 
         // Definitions
-        val stepSize = 1
+        val stepSize = 1.0
         var penultimateCost, lastCost, currentCost, newCost = cost(eigenvectors)
         var rotatedEigenvectors = DenseMatrix.zeros[Double](0, 0)
-        val maxIterations = 200
+
         var iteration = 0
         while (iteration < maxIterations) {
-            var angle = 0
-            while (angle < angles) {
+            iteration += 1
+            for (angle <- 0 until angles) {
                 val gradient = stochasticGradient(eigenvectors, theta, angles, angle)
                 newTheta(angle) = theta(angle) - stepSize * gradient
-                rotatedEigenvectors = rotate(eigenvectors, newTheta, angles)
+                rotatedEigenvectors = givensRotate(eigenvectors, newTheta, angles)
                 newCost = cost(rotatedEigenvectors)
                 if (newCost < currentCost) {
                     theta(angle) = newTheta(angle)
@@ -111,7 +113,6 @@ package object serial {
                 } else {
                     newTheta(angle) = theta(angle)
                 }
-                angle += 1
             }
             if (iteration > 2 && abs(currentCost - penultimateCost) < 1e-3) { // Stopping criteria
                 iteration = maxIterations
@@ -119,10 +120,9 @@ package object serial {
                 penultimateCost = lastCost
                 lastCost = currentCost
             }
-            iteration += 1
         }
 
-        rotatedEigenvectors = rotate(eigenvectors, newTheta, angles)
+        rotatedEigenvectors = givensRotate(eigenvectors, newTheta, angles)
         val clusts = clusters(rotatedEigenvectors)
         return (currentCost, clusts, rotatedEigenvectors)
     }
@@ -162,10 +162,10 @@ package object serial {
         val u1 = uAB(theta, 0, angle - 1, eigenvectors.cols)
         val u2 = uAB(theta, angle + 1, angles - 1, eigenvectors.cols)
 
-        val a = (eigenvectors * (u1 * (gradients * u2)))
+        val a = eigenvectors * u1 * gradients * u2
 
         // Rotate vectors according to angles.
-        val y = rotate(eigenvectors, theta, angles)
+        val y = givensRotate(eigenvectors, theta, angles)
 
         // Find the maximum of each row
         val squaredY = y :* y // :* = Hadamard product
@@ -199,23 +199,21 @@ package object serial {
 
         var k = a
         var tt, uIndex = 0.0
-        while (k <= b) {
+        for (k <- a to b) {
             tt = theta(k)
             val (i, j) = upperIndex(cols, k)
             var col = 0
-            while (col < cols) {
+            for (col <- 0 until cols) {
                 uIndex = uab(i, col) * cos(tt) - uab(j, col) * sin(tt)
                 uab(j, col) = uab(i, col) * sin(tt) * uab(j, col) * cos(tt)
                 uab(i, col) = uIndex
-                col += 1
             }
-            k += 1
         }
 
         return uab
     }
 
-    def rotate(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], angles: Int): DenseMatrix[Double] = {
+    def givensRotate(eigenvectors: DenseMatrix[Double], theta: DenseVector[Double], angles: Int): DenseMatrix[Double] = {
         val g = uAB(theta, 0, angles - 1, eigenvectors.cols)
         return eigenvectors * g
     }

@@ -16,17 +16,17 @@ object Algorithm {
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/5.csv").getPath()
+        val pathToMatrix = getClass.getResource("/noob.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.
         val originalMatrix = breeze.linalg.csvread(matrixFile)
 
         // Centralizing and scale the data.
-        val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
-        var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
-        matrix /= max(abs(matrix))
-        // val matrix = originalMatrix
+        // val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
+        // var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
+        // matrix /= max(abs(matrix))
+        val matrix = originalMatrix
 
         // Compute local scale (step 1).
         val distances = euclideanDistance(matrix)
@@ -81,20 +81,5 @@ object Algorithm {
                 clusters = tempClusters
             }
         }
-        // In evrot.cpp originally
-
-        // val f = Figure()
-        // val id2Color: Int => Paint = id => id match {
-        //     case 0 => Color.YELLOW
-        //     case 1 => Color.RED
-        //     case 2 => Color.GREEN
-        //     case 3 => Color.BLUE
-        //     case 4 => Color.GRAY
-        //     case _ => Color.BLACK
-        //   }
-        //
-        // f.subplot(0) +=  scatter(originalMatrix(::, 0), originalMatrix(::, 1), {(_:Int) => 1.0}, {(_:Int) => Color.BLACK})
-        // f.subplot(0).xlabel = "X-coordinate"
-        // f.subplot(0).ylabel = "Y-coordinate"
     }
 }
