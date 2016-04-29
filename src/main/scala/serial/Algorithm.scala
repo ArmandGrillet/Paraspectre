@@ -16,7 +16,7 @@ object Algorithm {
 
     def main(args: Array[String]) = {
         // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/5.csv").getPath()
+        val pathToMatrix = getClass.getResource("/4.csv").getPath()
         val matrixFile = new File(pathToMatrix)
 
         // Create a DenseMatrix from the CSV.

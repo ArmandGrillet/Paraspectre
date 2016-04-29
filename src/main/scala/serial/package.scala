@@ -3,6 +3,7 @@ import breeze.numerics._
 import breeze.stats._
 import breeze.plot._
 import java.awt.{Color, Paint}
+import scala.util.control._
 import org.jfree.chart.axis.{NumberTickUnit, TickUnits}
 
 package object serial {
@@ -129,31 +130,34 @@ package object serial {
         var iter, d = 0
 
         var theta, thetaNew = DenseVector.zeros[Double](angles)
+        val loop = new Breaks;
 
         q = evaluateQuality(ev)
         qOld1 = q
         qOld2 = q
-        while (iter < maxIterations) {
-            iter += 1
-            for (d <- 0 until angles) {
-                dQ = evaluateQualityGradient(theta, d)
-                thetaNew(d) = theta(d) - alpha * dQ
-                val evRot = rotateGivens(thetaNew)
-                qNew = evaluateQuality(evRot)
 
-                if (qNew > q) {
-                    theta(d) = thetaNew(d)
-                    q = qNew
-                } else {
-                    thetaNew(d) = theta(d)
+        loop.breakable{
+            for (iter <- 1 to maxIterations) {
+                for (d <- 0 until angles) {
+                    dQ = evaluateQualityGradient(theta, d)
+                    thetaNew(d) = theta(d) - alpha * dQ
+                    val evRot = rotateGivens(thetaNew)
+                    qNew = evaluateQuality(evRot)
+
+                    if (qNew > q) {
+                        theta(d) = thetaNew(d)
+                        q = qNew
+                    } else {
+                        thetaNew(d) = theta(d)
+                    }
                 }
-            }
 
-            if (iter > 2 && ((q - qOld2) < 1e-3)) {
-                iter = maxIterations
-            } else {
-                qOld2 = qOld1
-                qOld1 = q
+                if (iter > 2 && ((q - qOld2) < 1e-3)) {
+                    loop.break
+                } else {
+                    qOld2 = qOld1
+                    qOld1 = q
+                }
             }
         }
 
@@ -213,7 +217,7 @@ package object serial {
     }
 
     def rotateGivens(theta: DenseVector[Double]): DenseMatrix[Double] = {
-        val g = uAB(theta, 0, angles -1)
+        val g = uAB(theta, 0, angles - 1)
         val y = ev * g
         return y
     }
