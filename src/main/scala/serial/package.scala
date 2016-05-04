@@ -66,13 +66,49 @@ package object serial {
         return affinityMatrix
     }
 
-    def printVector(vector: DenseVector[Double]) {
+    def largestEigen(matrix: DenseMatrix[Double], length: Int): (DenseVector[Double], DenseMatrix[Double]) = {
+        // Compute the biggest eigenvectors
+        val eigenstuff = eig(matrix)
+        var unsortedEigenvalues = eigenstuff.eigenvalues // DenseVector
+        val unsortedEigenvectors = eigenstuff.eigenvectors // DenseMatrix
+        var eigenvectors = DenseMatrix.zeros[Double](unsortedEigenvectors.rows, length)
+        var eigenvalues = DenseVector.zeros[Double](length)
+
+        if (length <= unsortedEigenvalues.length) {
+            var i = 0
+            for (i <- 0 until length) {
+                val indexBiggestEigenvalue = argmax(eigenvalues)
+                eigenvalues(i) = unsortedEigenvalues(indexBiggestEigenvalue)
+                unsortedEigenvalues(indexBiggestEigenvalue) = scala.Double.NegativeInfinity
+                for (row <- 0 until unsortedEigenvectors.rows) {
+                    eigenvectors(row, i) = unsortedEigenvectors(row, indexBiggestEigenvalue)
+                }
+            }
+        }
+
+        return (eigenvalues, eigenvectors)
+    }
+
+    // Print methods
+
+    def printEigenvalues(ev: DenseVector[Double]) {
         val f = Figure()
         val p = f.subplot(0)
         p.title = "First 10 eigenvalues of L"
-        p.xlim(0, vector.length - 1)
+        p.xlim(0, ev.length - 1)
         p.ylim(0.9, 1.01)
         p.yaxis.setTickUnit(new NumberTickUnit(0.01));
+        val xVector = linspace(0, ev.length - 1, ev.length)
+
+        p += scatter(xVector, ev, {(_:Int) => 0.3}, {(_:Int) => Color.RED}) // Display the observations.
+    }
+
+    def printVector(vector: DenseVector[Double], xMin: Int, xMax: Int) {
+        val f = Figure()
+        val p = f.subplot(0)
+        p.xlim(xMin, xMax)
+        p.ylim(min(vector), max(vector))
+        // p.yaxis.setTickUnit(new NumberTickUnit(0.01));
 
         val xVector = linspace(0, vector.length - 1, vector.length)
 
@@ -89,18 +125,8 @@ package object serial {
         p += scatter(matrix(::, 0), matrix(::, 1), {(_:Int) => 0.01}, {(pos:Int) => colors(clusters(pos))}) // Display the observations.
     }
 
-    def logicalNot(matrix: DenseMatrix[Double]): DenseMatrix[Double] = {
-        return DenseMatrix.tabulate(matrix.rows, matrix.cols){
-            case (row, col) =>
-            if (matrix(row, col) == 0.0) {
-                1.0
-            } else {
-                0.0
-            }
-        }
-    }
+    // Step 5 of the self-tuning spectral clustering algorithm.
 
-    // Self-tuning spectral clustering last steps
     var dims = 0
     var data = 0
     var angles = 0
@@ -125,76 +151,83 @@ package object serial {
         }
 
         val maxIterations = 200
-        val alpha = 1.0
-        var dQ, q, qNew, qOld1, qOld2, qUp, qDown = 0.0
+
+        var nablaJ, quality = 0.0
+        var newQuality, old1Quality, old2Quality = 0.0 // Variables to compute the descend through true derivative.
+        var qualityUp, qualityDown = 0.0 // Variables to descend through numerical derivative.
         var iter, d = 0
+        var evRot = DenseMatrix.zeros[Double](0, 0)
 
         var theta, thetaNew = DenseVector.zeros[Double](angles)
         val loop = new Breaks;
 
-        q = evaluateQuality(ev)
-        qOld1 = q
-        qOld2 = q
+        quality = evaluateQuality(ev)
+        old1Quality = quality
+        old2Quality = quality
 
         loop.breakable{
             for (iter <- 1 to maxIterations) {
                 for (d <- 0 until angles) {
-                    dQ = evaluateQualityGradient(theta, d)
-                    thetaNew(d) = theta(d) - alpha * dQ
+                    val alpha = 1.0
+                    nablaJ = evaluateQualityGradient(theta, d)
+                    thetaNew(d) = theta(d) - alpha * nablaJ
                     val evRot = rotateGivens(thetaNew)
-                    qNew = evaluateQuality(evRot)
+                    newQuality = evaluateQuality(evRot)
 
-                    if (qNew > q) {
+                    if (newQuality > quality) {
                         theta(d) = thetaNew(d)
-                        q = qNew
+                        quality = newQuality
                     } else {
                         thetaNew(d) = theta(d)
                     }
                 }
 
-                if (iter > 2 && ((q - qOld2) < 1e-3)) {
+                if (iter > 2 && ((quality - old2Quality) > 0.001)) {
                     loop.break
-                } else {
-                    qOld2 = qOld1
-                    qOld1 = q
                 }
+                old2Quality = old1Quality
+                old1Quality = quality
             }
         }
 
         val finalEvRot = rotateGivens(thetaNew)
         val clusts = clusters(finalEvRot)
-        return (q, clusts, finalEvRot)
+        return (quality, clusts, finalEvRot)
     }
 
     def clusters(rotatedEigenvectors: DenseMatrix[Double]): DenseVector[Int] = {
-        val squaredVectors = rotatedEigenvectors :* rotatedEigenvectors
+        val squaredVectors = pow(rotatedEigenvectors, 2)
         return argmax(squaredVectors(*, ::))
     }
 
-    def evaluateQuality(x: DenseMatrix[Double]): Double = {
+    def evaluateQuality(matrix: DenseMatrix[Double]): Double = {
         // Take the square of all entries and find the max of each row
-        var x2 = pow(x, 2)
-        val maxValues = max(x2(*, ::)) // Max of each row
+        var squareMatrix = pow(matrix, 2)
+        val maxValues = max(squareMatrix(*, ::)) // Max of each row
 
         // Compute cost
-        var row, col = 0
-        for (row <- 0 until data) {
-            for (col <- 0 until dims) {
-                x2(row, col) /= maxValues(row)
+        var i, j = 0
+        var cost = 0.0
+        for (i <- 0 until data) {
+            for (j <- 0 until dims) {
+                cost += squareMatrix(i, j) / maxValues(i)
             }
         }
 
-        val j = 1.0 - (sum(x2) / data - 1.0) / dims
-        return j
+        return 1.0 - (cost / data - 1.0) / dims;
     }
 
     def evaluateQualityGradient(theta: DenseVector[Double], angle: Int): Double = {
         // Build V, U, A
-        val v = gradU(theta, angle)
-        val u1 = uAB(theta, 0, angle - 1)
+        var vForAngle = DenseMatrix.zeros[Double](dims, dims)
+        vForAngle(ik(angle),ik(angle)) = -sin(theta(angle))
+    	vForAngle(ik(angle),jk(angle)) = cos(theta(angle))
+    	vForAngle(jk(angle),ik(angle)) = -cos(theta(angle))
+    	vForAngle(jk(angle),jk(angle)) = -sin(theta(angle))
+        val u1 = uAB(theta, 1, angle - 1)
         val u2 = uAB(theta, angle + 1, angles -1)
 
-        val a = ev * u1 * v * u2
+        val a = ev * u1 * vForAngle * u2
 
         val y = rotateGivens(theta)
 
@@ -202,24 +235,23 @@ package object serial {
         val maxIndexCol = argmax(y(*, ::))
 
         // Compute gradient
-        var dJ, tmp1, tmp2 = 0.0
+        var nablaJ, tmp1, tmp2 = 0.0
         var i, j = 0
-        for (j <- 0 until dims) { // Loop over all columns
-            for (i <- 0 until data) { // Loop over all rows
+        for (i <- 0 until data) { // Loop over all rows
+            for (j <- 0 until dims) { // Loop over all columns
                 tmp1 = a(i, j) * y(i, j) / (maxValues(i) * maxValues(i))
                 tmp2 = a(i, maxIndexCol(i)) * pow(y(i, j), 2) / pow(maxValues(i), 3)
-                dJ += tmp1 - tmp2
+                nablaJ += tmp1 - tmp2
             }
         }
-        dJ = 2 * dJ / data / dims
+        nablaJ = 2 * nablaJ / data / dims
 
-        return dJ
+        return nablaJ
     }
 
     def rotateGivens(theta: DenseVector[Double]): DenseMatrix[Double] = {
         val g = uAB(theta, 0, angles - 1)
-        val y = ev * g
-        return y
+        return ev * g
     }
 
     def uAB(theta: DenseVector[Double], a: Int, b: Int): DenseMatrix[Double] = {
@@ -231,7 +263,7 @@ package object serial {
         }
 
         var tt, uIk = 0.0
-        for (k <- 0 to b) {
+        for (k <- a to b) {
             tt = theta(k)
             for (i <- 0 until dims) {
                 uIk = uab(i, ik(k)) * cos(tt) - uab(i, jk(k)) * sin(tt)
@@ -241,16 +273,5 @@ package object serial {
         }
 
         return uab
-    }
-
-    def gradU(theta: DenseVector[Double], k: Int): DenseMatrix[Double] = {
-        val v = DenseMatrix.zeros[Double](dims, dims)
-
-        v(ik(k),ik(k)) = -sin(theta(k))
-    	v(ik(k),jk(k)) = cos(theta(k))
-    	v(jk(k),ik(k)) = -cos(theta(k))
-    	v(jk(k),jk(k)) = -sin(theta(k))
-
-        return v
     }
 }
