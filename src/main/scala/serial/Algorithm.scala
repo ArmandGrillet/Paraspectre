@@ -6,31 +6,29 @@ import breeze.plot._
 import breeze.stats._
 import java.awt.{Color, Paint}
 import java.io.File
+import scala.collection.mutable.ListBuffer
 import scala.io.Source
 
-object Algorithm {
+class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClusters: Int, argDebug: Boolean) {
     // Parameters.
     val k = 7 // Kth neighbor used in local scaling.
-    val minClusters = 2 // Minimal number of clusters in the dataset.
-    val maxClusters = 6 // Maximal number of clusters in the dataset.
+    val dataset = argDataset
+    val minClusters = argMinClusters // Minimal number of clusters in the dataset.
+    val maxClusters = argMaxClusters // Maximal number of clusters in the dataset.
+    val printer = new Printer(argDebug)
 
-    def main(args: Array[String]) = {
-
-        // Choose the dataset to cluster.
-        val pathToMatrix = getClass.getResource("/5.csv").getPath()
-        val matrixFile = new File(pathToMatrix)
-
-        // Create a DenseMatrix from the CSV.
-        val originalMatrix = breeze.linalg.csvread(matrixFile)
+    def cluster(): DenseVector[Int] = {
 
         // Centralize and scale the data.
         // val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
         // var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
         // matrix /= max(abs(matrix))
-        val matrix = originalMatrix
+        //val matrix = originalMatrix
+
+        printer.printDataset(dataset)
 
         // Compute local scale (step 1).
-        val distances = euclideanDistance(matrix)
+        val distances = euclideanDistance(dataset)
         val locScale = localScale(distances, k)
 
         // Build locally scaled affinity matrix (step 2).
@@ -61,22 +59,21 @@ object Algorithm {
         // printVector(vectorToDisplay)
 
         // In cluster_rotate.m originally
+        var qualities = new ListBuffer[Double]()
         var currentEigenvectors = eigenvectors(::, 0 until minClusters)
         var (quality, clusters, rotatedEigenvectors) = paraspectre(currentEigenvectors)
+        qualities += quality
 
-        print(minClusters)
-        print(" clusters:\t")
-        println(quality)
+        println(minClusters + " clusters:\t" + quality)
 
         var group = 0
         for (group <- minClusters until maxClusters) {
             val eigenvectorToAdd = eigenvectors(::, group).toDenseMatrix.t
             currentEigenvectors = DenseMatrix.horzcat(rotatedEigenvectors, eigenvectorToAdd)
             val (tempQuality, tempClusters, tempRotatedEigenvectors) = paraspectre(currentEigenvectors)
+            qualities += tempQuality
             rotatedEigenvectors = tempRotatedEigenvectors
-            print(group + 1)
-            print(" clusters:\t")
-            println(tempQuality)
+            println((group + 1) + " clusters:\t" + tempQuality)
 
             if (tempQuality >= quality - 0.001) {
                 quality = tempQuality
@@ -84,7 +81,8 @@ object Algorithm {
             }
         }
 
-        // printVector(costToDisplay, minClusters, maxClusters)
-        printClusters(originalMatrix, clusters)
+        printer.printQualities(qualities, minClusters)
+        printer.printClusters(dataset, clusters)
+        return clusters
     }
 }
