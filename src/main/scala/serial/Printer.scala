@@ -47,16 +47,21 @@ class Printer(argDebug: Boolean) {
         }
     }
 
-    def printEigenvalues(ev: DenseVector[Double]) {
+    def printEigenvalues(eigenvalues: DenseVector[Double]) {
         if (debug) {
             val p = f.subplot(2,2,2)
-            p.title = "First 10 eigenvalues of L"
-            p.xlim(0, ev.length - 1)
-            p.ylim(0.9, 1.01)
-            p.yaxis.setTickUnit(new NumberTickUnit(0.01))
-            val xVector = linspace(0, ev.length - 1, ev.length)
+            p.title = "First " + eigenvalues.length + " eigenvalues of L"
+            p.yaxis.setTickUnit(new NumberTickUnit(0.005))
+            val xVector = linspace(0, eigenvalues.length - 1, eigenvalues.length)
 
-            p += scatter(xVector, ev, {(_:Int) => 0.3}, {(_:Int) => Color.RED}) // Display the observations.
+            p += scatter(xVector, eigenvalues, {(_:Int) => 0.05}, {(_:Int) => Color.RED}) // Display the observations.
+
+            (0 until (eigenvalues.length - 1)).map{ eigenvalue =>
+                val x = linspace(eigenvalue, eigenvalue + 1)
+                val factor = eigenvalues(eigenvalue + 1) - eigenvalues(eigenvalue)
+                val y = DenseVector.tabulate(x.length){i => eigenvalues(eigenvalue) + factor * (x(i) - x(0))}
+                p += plot(x, y, '-', "BLUE")
+            }
         }
     }
 
@@ -74,8 +79,8 @@ class Printer(argDebug: Boolean) {
     def printQualities(qualities: ListBuffer[Double], minClusters: Int) {
         if (debug) {
             val p = f.subplot(2,2,3)
-            p.yaxis.setTickUnit(new NumberTickUnit(0.01))
             p.title = "Qualities"
+            p.yaxis.setTickUnit(new NumberTickUnit(0.01))
 
             val qualitiesVector = new DenseVector(qualities.toArray)
             val xVector = linspace(minClusters, (qualities.length - 1) + minClusters, qualities.length)

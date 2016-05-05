@@ -43,20 +43,20 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
         var eigenvalues = eigenstuff.eigenvalues // DenseVector
         val unsortedEigenvectors = eigenstuff.eigenvectors // DenseMatrix
         var eigenvectors = DenseMatrix.zeros[Double](unsortedEigenvectors.rows, maxClusters)
-        var vectorToDisplay = DenseVector.zeros[Double](maxClusters)
+        var biggestEigenvalues = DenseVector.zeros[Double](maxClusters)
 
         var i = 0
         val minEigenvalue = min(eigenvalues)
         for (i <- 0 until maxClusters) {
             val indexBiggestEigenvalue = argmax(eigenvalues)
-            vectorToDisplay(i) = eigenvalues(indexBiggestEigenvalue)
+            biggestEigenvalues(i) = eigenvalues(indexBiggestEigenvalue)
             eigenvalues(indexBiggestEigenvalue) = minEigenvalue
             for (row <- 0 until unsortedEigenvectors.rows) {
                 eigenvectors(row, i) = unsortedEigenvectors(row, indexBiggestEigenvalue)
             }
         }
 
-        // printVector(vectorToDisplay)
+        printer.printEigenvalues(biggestEigenvalues)
 
         // In cluster_rotate.m originally
         var qualities = new ListBuffer[Double]()
