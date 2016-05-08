@@ -36,10 +36,18 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
 
         // Build the normalized affinity matrix (step 3)
         val diagonalMatrix = diag(pow(sum(locallyScaledA(*, ::)), -0.5)) // Sum of each row, then power -0.5, then matrix.
-        val normalizedA = diagonalMatrix * locallyScaledA * diagonalMatrix
+        var normalizedA = diagonalMatrix * locallyScaledA * diagonalMatrix
+        
+        // Breeze does not think normalizedA is symmetric, let's fix that.
+        var row, col = 0
+        for (row <- 0 until normalizedA.rows) {
+            for (col <- row + 1 until normalizedA.cols) {
+                normalizedA(col, row) = normalizedA(row, col)
+            }
+        }
 
         // Compute the largest eigenvectors
-        val eigenstuff = eig(normalizedA)
+        val eigenstuff = eigSym(normalizedA)
         var eigenvalues = eigenstuff.eigenvalues // DenseVector
         val unsortedEigenvectors = eigenstuff.eigenvectors // DenseMatrix
         var eigenvectors = DenseMatrix.zeros[Double](unsortedEigenvectors.rows, maxClusters)
@@ -49,14 +57,19 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
         val minEigenvalue = min(eigenvalues)
         for (i <- 0 until maxClusters) {
             val indexBiggestEigenvalue = argmax(eigenvalues)
+            println("eigenvalue n°" + indexBiggestEigenvalue + " : " + eigenvalues(indexBiggestEigenvalue))
             biggestEigenvalues(i) = eigenvalues(indexBiggestEigenvalue)
             eigenvalues(indexBiggestEigenvalue) = minEigenvalue
             for (row <- 0 until unsortedEigenvectors.rows) {
                 eigenvectors(row, i) = unsortedEigenvectors(row, indexBiggestEigenvalue)
             }
         }
-
+        println("")
         printer.printEigenvalues(biggestEigenvalues)
+
+        // csvwrite(new File("eigenvectors3.txt"), eigenvectors3, separator = ',')
+        // val staticEigenvectors = new File("eigenvectors3.txt")
+        // eigenvectors = breeze.linalg.csvread(staticEigenvectors)
 
         // In cluster_rotate.m originally
         var qualities = new ListBuffer[Double]()

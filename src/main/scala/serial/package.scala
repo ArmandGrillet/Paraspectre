@@ -214,7 +214,7 @@ package object serial {
             }
         }
 
-        return 1.0 - (cost / data - 1.0) / dims;
+        return 1.0 - (cost / data - 1.0) / dims
     }
 
     def evaluateQualityGradient(theta: DenseVector[Double], angle: Int): Double = {
