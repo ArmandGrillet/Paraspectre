@@ -66,65 +66,6 @@ package object serial {
         return affinityMatrix
     }
 
-    def largestEigen(matrix: DenseMatrix[Double], length: Int): (DenseVector[Double], DenseMatrix[Double]) = {
-        // Compute the biggest eigenvectors
-        val eigenstuff = eig(matrix)
-        var unsortedEigenvalues = eigenstuff.eigenvalues // DenseVector
-        val unsortedEigenvectors = eigenstuff.eigenvectors // DenseMatrix
-        var eigenvectors = DenseMatrix.zeros[Double](unsortedEigenvectors.rows, length)
-        var eigenvalues = DenseVector.zeros[Double](length)
-
-        if (length <= unsortedEigenvalues.length) {
-            var i = 0
-            for (i <- 0 until length) {
-                val indexBiggestEigenvalue = argmax(eigenvalues)
-                eigenvalues(i) = unsortedEigenvalues(indexBiggestEigenvalue)
-                unsortedEigenvalues(indexBiggestEigenvalue) = scala.Double.NegativeInfinity
-                for (row <- 0 until unsortedEigenvectors.rows) {
-                    eigenvectors(row, i) = unsortedEigenvectors(row, indexBiggestEigenvalue)
-                }
-            }
-        }
-
-        return (eigenvalues, eigenvectors)
-    }
-
-    // Print methods
-
-    def printEigenvalues(ev: DenseVector[Double]) {
-        val f = Figure()
-        val p = f.subplot(0)
-        p.title = "First 10 eigenvalues of L"
-        p.xlim(0, ev.length - 1)
-        p.ylim(0.9, 1.01)
-        p.yaxis.setTickUnit(new NumberTickUnit(0.01));
-        val xVector = linspace(0, ev.length - 1, ev.length)
-
-        p += scatter(xVector, ev, {(_:Int) => 0.3}, {(_:Int) => Color.RED}) // Display the observations.
-    }
-
-    def printVector(vector: DenseVector[Double], xMin: Int, xMax: Int) {
-        val f = Figure()
-        val p = f.subplot(0)
-        p.xlim(xMin, xMax)
-        p.ylim(min(vector), max(vector))
-        // p.yaxis.setTickUnit(new NumberTickUnit(0.01));
-
-        val xVector = linspace(0, vector.length - 1, vector.length)
-
-        p += scatter(xVector, vector, {(_:Int) => 0.3}, {(_:Int) => Color.RED}) // Display the observations.
-    }
-
-    def printClusters(matrix: DenseMatrix[Double], clusters: DenseVector[Int]) {
-        val colors = List(Color.RED, Color.GREEN, Color.BLUE, Color.BLACK, Color.MAGENTA, Color.CYAN, Color.YELLOW)
-
-        val f = Figure()
-        val p = f.subplot(0)
-        p.title = "Clusters"
-
-        p += scatter(matrix(::, 0), matrix(::, 1), {(_:Int) => 0.01}, {(pos:Int) => colors(clusters(pos))}) // Display the observations.
-    }
-
     // Step 5 of the self-tuning spectral clustering algorithm.
 
     var dims = 0
@@ -159,7 +100,7 @@ package object serial {
         var evRot = DenseMatrix.zeros[Double](0, 0)
 
         var theta, thetaNew = DenseVector.zeros[Double](angles)
-        val loop = new Breaks;
+        val loop = new Breaks
 
         quality = evaluateQuality(ev)
         old1Quality = quality
@@ -168,21 +109,44 @@ package object serial {
         loop.breakable{
             for (iter <- 1 to maxIterations) {
                 for (d <- 0 until angles) {
-                    val alpha = 1.0
-                    nablaJ = evaluateQualityGradient(theta, d)
-                    thetaNew(d) = theta(d) - alpha * nablaJ
-                    val evRot = rotateGivens(thetaNew)
-                    newQuality = evaluateQuality(evRot)
+                    val alpha = 0.1
+                    // move up
+                    thetaNew(d) = theta(d) + alpha
+                    evRot = rotateGivens(thetaNew)
+                    qualityUp = evaluateQuality(evRot)
 
-                    if (newQuality > quality) {
-                        theta(d) = thetaNew(d)
-                        quality = newQuality
-                    } else {
-                        thetaNew(d) = theta(d)
+                    // move down
+                    thetaNew(d) = theta(d) - alpha
+                    evRot = rotateGivens(thetaNew)
+                    qualityDown = evaluateQuality(evRot)
+
+                    // update only if at least one of them is better
+                    if( qualityUp > quality || qualityDown > quality){
+                        if( qualityUp > qualityDown ){
+                            theta(d) = theta(d) + alpha
+                            thetaNew(d) = theta(d)
+                            quality = qualityUp
+                        } else {
+                            theta(d) = theta(d) - alpha
+                            thetaNew(d) = theta(d)
+                            quality = qualityDown
+                        }
                     }
+                    // val alpha = 1.0
+                    // nablaJ = evaluateQualityGradient(theta, d)
+                    // thetaNew(d) = theta(d) - alpha * nablaJ
+                    // val evRot = rotateGivens(thetaNew)
+                    // newQuality = evaluateQuality(evRot)
+                    //
+                    // if (newQuality > quality) {
+                    //     theta(d) = thetaNew(d)
+                    //     quality = newQuality
+                    // } else {
+                    //     thetaNew(d) = theta(d)
+                    // }
                 }
 
-                if (iter > 2 && ((quality - old2Quality) > 0.001)) {
+                if (iter > 2 && ((quality - old2Quality) < 0.001)) {
                     loop.break
                 }
                 old2Quality = old1Quality
@@ -221,9 +185,9 @@ package object serial {
         // Build V, U, A
         var vForAngle = DenseMatrix.zeros[Double](dims, dims)
         vForAngle(ik(angle),ik(angle)) = -sin(theta(angle))
-    	vForAngle(ik(angle),jk(angle)) = cos(theta(angle))
-    	vForAngle(jk(angle),ik(angle)) = -cos(theta(angle))
-    	vForAngle(jk(angle),jk(angle)) = -sin(theta(angle))
+        vForAngle(ik(angle),jk(angle)) = cos(theta(angle))
+        vForAngle(jk(angle),ik(angle)) = -cos(theta(angle))
+        vForAngle(jk(angle),jk(angle)) = -sin(theta(angle))
         val u1 = uAB(theta, 1, angle - 1)
         val u2 = uAB(theta, angle + 1, angles -1)
 

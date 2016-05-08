@@ -20,10 +20,10 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
     def cluster(): DenseVector[Int] = {
 
         // Centralize and scale the data.
-        // val meanCols = mean(originalMatrix(::, *)).t.toDenseMatrix
-        // var matrix = (originalMatrix - vertStack(meanCols, originalMatrix.rows))
+        // val meanCols = mean(dataset(::, *)).t.toDenseMatrix
+        // var matrix = (dataset - vertStack(meanCols, dataset.rows))
         // matrix /= max(abs(matrix))
-        //val matrix = originalMatrix
+        // val matrix = dataset
 
         printer.printDataset(dataset)
 
@@ -32,12 +32,12 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
         val locScale = localScale(distances, k)
 
         // Build locally scaled affinity matrix (step 2).
-        var locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
+        val locallyScaledA = locallyScaledAffinityMatrix(distances, locScale)
 
         // Build the normalized affinity matrix (step 3)
         val diagonalMatrix = diag(pow(sum(locallyScaledA(*, ::)), -0.5)) // Sum of each row, then power -0.5, then matrix.
         var normalizedA = diagonalMatrix * locallyScaledA * diagonalMatrix
-        
+
         // Breeze does not think normalizedA is symmetric, let's fix that.
         var row, col = 0
         for (row <- 0 until normalizedA.rows) {
@@ -48,20 +48,15 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
 
         // Compute the largest eigenvectors
         val eigenstuff = eigSym(normalizedA)
-        var eigenvalues = eigenstuff.eigenvalues // DenseVector
-        val unsortedEigenvectors = eigenstuff.eigenvectors // DenseMatrix
-        var eigenvectors = DenseMatrix.zeros[Double](unsortedEigenvectors.rows, maxClusters)
+        var eigenvectors = DenseMatrix.zeros[Double](eigenstuff.eigenvectors.rows, maxClusters)
         var biggestEigenvalues = DenseVector.zeros[Double](maxClusters)
 
         var i = 0
-        val minEigenvalue = min(eigenvalues)
         for (i <- 0 until maxClusters) {
-            val indexBiggestEigenvalue = argmax(eigenvalues)
-            println("eigenvalue n°" + indexBiggestEigenvalue + " : " + eigenvalues(indexBiggestEigenvalue))
-            biggestEigenvalues(i) = eigenvalues(indexBiggestEigenvalue)
-            eigenvalues(indexBiggestEigenvalue) = minEigenvalue
-            for (row <- 0 until unsortedEigenvectors.rows) {
-                eigenvectors(row, i) = unsortedEigenvectors(row, indexBiggestEigenvalue)
+            biggestEigenvalues(i) = eigenstuff.eigenvalues(-(1 + i))
+            println("eigenvalue n°" + i + " : " + biggestEigenvalues(i))
+            for (row <- 0 until eigenstuff.eigenvectors.rows) {
+                eigenvectors(row, i) = eigenstuff.eigenvectors(row, -(1 + i))
             }
         }
         println("")
@@ -88,7 +83,7 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
             rotatedEigenvectors = tempRotatedEigenvectors
             println((group + 1) + " clusters:\t" + tempQuality)
 
-            if (tempQuality >= quality - 0.001) {
+            if (tempQuality >= quality - 0.002) {
                 quality = tempQuality
                 clusters = tempClusters
             }
