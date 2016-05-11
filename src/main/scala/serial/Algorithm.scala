@@ -20,15 +20,15 @@ class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClus
     def cluster(): DenseVector[Int] = {
 
         // Centralize and scale the data.
-        // val meanCols = mean(dataset(::, *)).t.toDenseMatrix
-        // var matrix = (dataset - vertStack(meanCols, dataset.rows))
-        // matrix /= max(abs(matrix))
+        val meanCols = mean(dataset(::, *)).t.toDenseMatrix
+        var matrix = (dataset - vertStack(meanCols, dataset.rows))
+        matrix /= max(abs(matrix))
         // val matrix = dataset
 
-        printer.printDataset(dataset)
+        printer.printDataset(matrix)
 
         // Compute local scale (step 1).
-        val distances = euclideanDistance(dataset)
+        val distances = euclideanDistance(matrix)
         val locScale = localScale(distances, k)
 
         // Build locally scaled affinity matrix (step 2).
