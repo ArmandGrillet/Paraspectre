@@ -10,6 +10,7 @@ object Serial {
         var min = 2
         var max = 6
         var debug = false
+        var result = false
 
         args.sliding(2, 1).toList.collect {
             case Array("--data", argData: String) => dataset = argData
@@ -17,6 +18,7 @@ object Serial {
             case Array("--min", argMin: String) => min = argMin.toInt
             case Array("--max", argMax: String) => max = argMax.toInt
             case Array("--debug", argDebug: String) => debug = argDebug.toBoolean
+            case Array("--result", argResult: String) => result = argResult.toBoolean
         }
 
         if (dataset.takeRight(4) != ".csv") {
@@ -37,5 +39,8 @@ object Serial {
 
         val algorithm = new Algorithm(originalMatrix, min, max, debug)
         val clusters = algorithm.cluster()
+        if (result) {
+            println(clusters)
+        }
     }
 }

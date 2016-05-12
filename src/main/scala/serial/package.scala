@@ -155,13 +155,18 @@ package object serial {
         }
 
         val finalEvRot = rotateGivens(thetaNew)
-        val clusts = clusters(finalEvRot)
-        return (quality, clusts, finalEvRot)
+
+        if (quality equals Double.NaN) {
+            return (0, null, finalEvRot)
+        } else {
+            val clusts = clusters(finalEvRot)
+            return (quality, clusts, finalEvRot)
+        }
     }
 
     def clusters(rotatedEigenvectors: DenseMatrix[Double]): DenseVector[Int] = {
-        val squaredVectors = pow(rotatedEigenvectors, 2)
-        return argmax(squaredVectors(*, ::))
+        val absEigenvectors = abs(rotatedEigenvectors)
+        return argmax(absEigenvectors(*, ::))
     }
 
     def evaluateQuality(matrix: DenseMatrix[Double]): Double = {
