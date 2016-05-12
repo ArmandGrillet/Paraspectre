@@ -132,18 +132,6 @@ package object serial {
                             quality = qualityDown
                         }
                     }
-                    // val alpha = 1.0
-                    // nablaJ = evaluateQualityGradient(theta, d)
-                    // thetaNew(d) = theta(d) - alpha * nablaJ
-                    // val evRot = rotateGivens(thetaNew)
-                    // newQuality = evaluateQuality(evRot)
-                    //
-                    // if (newQuality > quality) {
-                    //     theta(d) = thetaNew(d)
-                    //     quality = newQuality
-                    // } else {
-                    //     thetaNew(d) = theta(d)
-                    // }
                 }
 
                 if (iter > 2 && ((quality - old2Quality) < 0.001)) {
@@ -174,48 +162,9 @@ package object serial {
         var squareMatrix = pow(matrix, 2)
         val maxValues = max(squareMatrix(*, ::)) // Max of each row
 
-        // Compute cost
-        var i, j = 0
-        var cost = 0.0
-        for (i <- 0 until data) {
-            for (j <- 0 until dims) {
-                cost += squareMatrix(i, j) / maxValues(i)
-            }
-        }
+        val cost = sum(sum(squareMatrix(*, ::)) / max(squareMatrix(*, ::))) // Sum of (sum of each row divided by max of each row).
 
         return 1.0 - (cost / data - 1.0) / dims
-    }
-
-    def evaluateQualityGradient(theta: DenseVector[Double], angle: Int): Double = {
-        // Build V, U, A
-        var vForAngle = DenseMatrix.zeros[Double](dims, dims)
-        vForAngle(ik(angle),ik(angle)) = -sin(theta(angle))
-        vForAngle(ik(angle),jk(angle)) = cos(theta(angle))
-        vForAngle(jk(angle),ik(angle)) = -cos(theta(angle))
-        vForAngle(jk(angle),jk(angle)) = -sin(theta(angle))
-        val u1 = uAB(theta, 1, angle - 1)
-        val u2 = uAB(theta, angle + 1, angles -1)
-
-        val a = ev * u1 * vForAngle * u2
-
-        val y = rotateGivens(theta)
-
-        val maxValues = max(y(*, ::)) // Max of each row
-        val maxIndexCol = argmax(y(*, ::))
-
-        // Compute gradient
-        var nablaJ, tmp1, tmp2 = 0.0
-        var i, j = 0
-        for (i <- 0 until data) { // Loop over all rows
-            for (j <- 0 until dims) { // Loop over all columns
-                tmp1 = a(i, j) * y(i, j) / (maxValues(i) * maxValues(i))
-                tmp2 = a(i, maxIndexCol(i)) * pow(y(i, j), 2) / pow(maxValues(i), 3)
-                nablaJ += tmp1 - tmp2
-            }
-        }
-        nablaJ = 2 * nablaJ / data / dims
-
-        return nablaJ
     }
 
     def rotateGivens(theta: DenseVector[Double]): DenseMatrix[Double] = {
