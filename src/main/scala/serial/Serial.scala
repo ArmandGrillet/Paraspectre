@@ -37,8 +37,8 @@ object Serial {
         // Create a DenseMatrix from the CSV.
         val originalMatrix = breeze.linalg.csvread(datasetFile)
 
-        val algorithm = new Algorithm(originalMatrix, min, max, debug)
-        val clusters = algorithm.cluster()
+        val algorithm = new Algorithm(min, max, debug)
+        val clusters = algorithm.cluster(originalMatrix)
         if (result) {
             println(clusters)
         }

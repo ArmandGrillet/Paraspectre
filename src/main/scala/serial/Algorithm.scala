@@ -9,16 +9,13 @@ import java.io.File
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
 
-class Algorithm(argDataset: DenseMatrix[Double], argMinClusters: Int, argMaxClusters: Int, argDebug: Boolean) {
-    // Parameters.
+class Algorithm(argMinClusters: Int, argMaxClusters: Int, argDebug: Boolean) {
     val k = 7 // Kth neighbor used in local scaling.
-    val dataset = argDataset
     val minClusters = argMinClusters // Minimal number of clusters in the dataset.
     val maxClusters = argMaxClusters // Maximal number of clusters in the dataset.
     val printer = new Printer(argDebug)
 
-    def cluster(): DenseVector[Int] = {
-
+    def cluster(dataset: DenseMatrix[Double]): DenseVector[Int] = {
         // Centralize and scale the data.
         val meanCols = mean(dataset(::, *)).t.toDenseMatrix
         var matrix = (dataset - vertStack(meanCols, dataset.rows))
