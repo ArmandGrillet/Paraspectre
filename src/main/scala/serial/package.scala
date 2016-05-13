@@ -1,10 +1,10 @@
 import breeze.linalg._
 import breeze.numerics._
 import breeze.stats._
-import breeze.plot._
-import java.awt.{Color, Paint}
+import java.awt.{Color, Paint, Toolkit}
+import java.awt.image.BufferedImage
+import javax.swing.GrayFilter
 import scala.util.control._
-import org.jfree.chart.axis.{NumberTickUnit, TickUnits}
 
 package object serial {
     // Miscellanous functions
@@ -191,5 +191,20 @@ package object serial {
         }
 
         return uab
+    }
+
+    // Image segmentation
+    def imageDistance(img: DenseMatrix[Double], radius: Int): DenseMatrix[Double] = {
+        // Make sure image values are within 0-1 and not 0-255
+        if (max(img) > 1.0) {
+            img /= 255.0
+        }
+
+        // Build distance matrix for first color channel
+
+    }
+
+    def makeImageDistance(img: DenseMatrix[Double], radius: Int): (DenseMatrix[Double], Int, Int) = {
+        
     }
 }
