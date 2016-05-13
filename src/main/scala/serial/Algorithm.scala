@@ -2,11 +2,7 @@ package serial
 
 import breeze.linalg._
 import breeze.numerics._
-
-import java.awt.image.BufferedImage
-import java.awt.Toolkit
-import java.io.File
-import javax.swing.GrayFilter
+import breeze.stats._
 
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
@@ -91,19 +87,5 @@ class Algorithm(argMinClusters: Int, argMaxClusters: Int, argDebug: Boolean) {
         printer.printQualities(qualities, minClusters)
         printer.printClusters(dataset, clusters)
         return clusters
-    }
-
-    def segment(img: BufferedImage): java.awt.Image = {
-        // Make gray
-        val filter = new GrayFilter(true, 50)
-        val producer = new FilteredImageSource(img.getSource(), filter)
-        val grayImage = Toolkit.getDefaultToolkit().createImage(producer)
-
-        // Create a matrix from the image
-        val matrix = DenseMatrix.tabulate(img.getHeight(), img.getWidth()){ case (i, j) => (grayImage.getRGB(i, j)).toDouble }
-
-        // Compute local scale (step 1).
-        val distances = euclideanDistance(matrix)
-        val locScale = localScale(distances, k)
     }
 }
